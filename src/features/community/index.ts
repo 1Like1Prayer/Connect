@@ -1,0 +1,5 @@
+export { CategoriesPage } from './CategoriesPage'
+export { MyConnectsPage } from './MyConnectsPage'
+export { ChatPage } from './ChatPage'
+export { AlertsPage } from './AlertsPage'
+export { KitPage } from './KitPage'

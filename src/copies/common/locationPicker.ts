@@ -1,0 +1,18 @@
+export const locationPickerCopy = {
+  parkHaYarkonTelAviv: "Park HaYarkon, Tel Aviv",
+  gordonBeachTelAviv: "Gordon Beach, Tel Aviv",
+  florentinTelAvivApproximateArea: "Florentin, Tel Aviv (approximate area)",
+  rothschildBoulevardTelAviv: "Rothschild Boulevard, Tel Aviv",
+  saronaTelAviv: "Sarona, Tel Aviv",
+  searchACityAddressOrPlace: "Search a city, address or place",
+  selectAPlaceThenConfirmThePin: "Select a place, then confirm the pin.",
+  tryParkHaYarkonOrFlorentin: "Try Park HaYarkon or Florentin",
+  lookingUpPlaces: "Looking up places...",
+  retrySearch: "Retry search",
+  noMatchingPlacesTryACityOrADifferent: "No matching places. Try a city or a different address.",
+  commaSeparatorWithSpace: ", ",
+  pinConfirmed: "\u00b7 Pin confirmed",
+  confirmThisMeetingArea: "\u00b7 Confirm this meeting area",
+  changeConfirmation: "Change confirmation",
+  confirmPin: "Confirm pin",
+} as const

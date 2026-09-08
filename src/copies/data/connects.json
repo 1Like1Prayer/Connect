@@ -1,0 +1,548 @@
+{
+  "connects": [
+    {
+      "id": 1,
+      "categoryKey": "sports",
+      "subcategoryName": "Football",
+      "title": "Five-a-side, short two players",
+      "publicAreaLabel": "Park HaYarkon",
+      "distanceKilometers": 1.2,
+      "dayLabel": "Today",
+      "startTimeLabel": "19:30",
+      "durationLabel": "1 h 30 m",
+      "attendeeCount": 8,
+      "capacity": 10,
+      "skillLevel": "Intermediate",
+      "isStartingSoon": true,
+      "startsInLabel": "In 2 h",
+      "hostName": "Noa Berkovich",
+      "rating": 4.9,
+      "hostedConnectCount": 24,
+      "attendanceRate": 97,
+      "isVerified": true,
+      "costLabel": "Split ₪20",
+      "latitude": 32.102,
+      "longitude": 34.804
+    },
+    {
+      "id": 2,
+      "isLocationPrivate": true,
+      "categoryKey": "gaming",
+      "subcategoryName": "Board games",
+      "title": "Catan table looking for a fourth",
+      "publicAreaLabel": "Florentin",
+      "distanceKilometers": 0.6,
+      "dayLabel": "Today",
+      "startTimeLabel": "20:00",
+      "durationLabel": "3 h",
+      "attendeeCount": 3,
+      "capacity": 4,
+      "isStartingSoon": true,
+      "startsInLabel": "In 3 h",
+      "hostName": "Yonatan Shalev",
+      "rating": 4.8,
+      "hostedConnectCount": 11,
+      "isVerified": true,
+      "costLabel": "Free",
+      "latitude": 32.057,
+      "longitude": 34.766
+    },
+    {
+      "id": 3,
+      "categoryKey": "sports",
+      "subcategoryName": "Climbing",
+      "title": "Bouldering session, intermediate routes",
+      "publicAreaLabel": "Yad Eliyahu",
+      "distanceKilometers": 3.4,
+      "dayLabel": "Today",
+      "startTimeLabel": "18:00",
+      "durationLabel": "2 h",
+      "attendeeCount": 4,
+      "capacity": 6,
+      "skillLevel": "Intermediate",
+      "isStartingSoon": true,
+      "startsInLabel": "In 40 m",
+      "hostName": "Adi Nachum",
+      "rating": 4.6,
+      "hostedConnectCount": 7,
+      "costLabel": "Ticketed ₪65",
+      "latitude": 32.05,
+      "longitude": 34.79
+    },
+    {
+      "id": 4,
+      "requiresApproval": true,
+      "isLocationPrivate": true,
+      "categoryKey": "social",
+      "subcategoryName": "Movie night",
+      "title": "Wong Kar-wai double bill on the roof",
+      "publicAreaLabel": "Kerem HaTeimanim",
+      "distanceKilometers": 0.8,
+      "dayLabel": "Today",
+      "startTimeLabel": "21:30",
+      "durationLabel": "3 h",
+      "attendeeCount": 5,
+      "capacity": 8,
+      "isStartingSoon": true,
+      "startsInLabel": "In 4 h",
+      "hostName": "Guy Almog",
+      "rating": 4.7,
+      "hostedConnectCount": 9,
+      "costLabel": "Free",
+      "latitude": 32.07,
+      "longitude": 34.767
+    },
+    {
+      "id": 5,
+      "categoryKey": "sports",
+      "subcategoryName": "Running",
+      "title": "Morning run, 6 km at an easy pace",
+      "publicAreaLabel": "Gordon Beach",
+      "distanceKilometers": 1.8,
+      "dayLabel": "Tomorrow",
+      "startTimeLabel": "06:45",
+      "durationLabel": "1 h",
+      "attendeeCount": 6,
+      "capacity": null,
+      "skillLevel": "Beginner",
+      "hostName": "Tal Ravid",
+      "rating": 5,
+      "hostedConnectCount": 48,
+      "attendanceRate": 99,
+      "isVerified": true,
+      "costLabel": "Free",
+      "latitude": 32.0836,
+      "longitude": 34.7671
+    },
+    {
+      "id": 6,
+      "requiresApproval": true,
+      "isLocationPrivate": true,
+      "categoryKey": "wellness",
+      "subcategoryName": "Yoga",
+      "title": "Vinyasa in the park before work",
+      "publicAreaLabel": "Old North",
+      "distanceKilometers": 2.2,
+      "dayLabel": "Tomorrow",
+      "startTimeLabel": "08:00",
+      "durationLabel": "1 h",
+      "attendeeCount": 7,
+      "capacity": 12,
+      "hostName": "Dana Peretz",
+      "rating": 4.9,
+      "hostedConnectCount": 40,
+      "attendanceRate": 96,
+      "isVerified": true,
+      "costLabel": "Split ₪15",
+      "participationRestriction": "Women only",
+      "latitude": 32.087,
+      "longitude": 34.776
+    },
+    {
+      "id": 7,
+      "categoryKey": "learn",
+      "subcategoryName": "Language exchange",
+      "title": "Hebrew and Spanish over coffee",
+      "publicAreaLabel": "Neve Tzedek",
+      "distanceKilometers": 1.1,
+      "dayLabel": "Wed",
+      "startTimeLabel": "19:00",
+      "durationLabel": "1 h 30 m",
+      "attendeeCount": 9,
+      "capacity": 16,
+      "hostName": "Lior Kaplan",
+      "rating": 4.9,
+      "hostedConnectCount": 19,
+      "costLabel": "Free",
+      "latitude": 32.064,
+      "longitude": 34.762
+    },
+    {
+      "id": 8,
+      "categoryKey": "social",
+      "subcategoryName": "Bar crawl",
+      "title": "Thursday bar crawl down Rothschild",
+      "publicAreaLabel": "Rothschild Blvd",
+      "distanceKilometers": 0.9,
+      "dayLabel": "Thu",
+      "startTimeLabel": "21:00",
+      "durationLabel": "4 h",
+      "attendeeCount": 14,
+      "capacity": null,
+      "hostName": "Maya Adler",
+      "rating": 4.7,
+      "hostedConnectCount": 31,
+      "attendanceRate": 92,
+      "costLabel": "Pay your own",
+      "participationRestriction": "21–35",
+      "latitude": 32.0653,
+      "longitude": 34.7737
+    },
+    {
+      "id": 9,
+      "categoryKey": "learn",
+      "subcategoryName": "Coding night",
+      "title": "Hack night: bring whatever you are stuck on",
+      "publicAreaLabel": "Sarona",
+      "distanceKilometers": 1.6,
+      "dayLabel": "Tue",
+      "startTimeLabel": "19:00",
+      "durationLabel": "3 h",
+      "attendeeCount": 12,
+      "capacity": null,
+      "hostName": "Eitan Mor",
+      "rating": 4.8,
+      "hostedConnectCount": 27,
+      "isVerified": true,
+      "costLabel": "Free",
+      "latitude": 32.0715,
+      "longitude": 34.787
+    },
+    {
+      "id": 10,
+      "categoryKey": "outdoors",
+      "subcategoryName": "Picnic",
+      "title": "Sunset picnic, bring something to share",
+      "publicAreaLabel": "Park HaYarkon",
+      "distanceKilometers": 1.4,
+      "dayLabel": "Fri",
+      "startTimeLabel": "17:30",
+      "durationLabel": "2 h",
+      "attendeeCount": 11,
+      "capacity": null,
+      "hostName": "Shira Ben-Ami",
+      "rating": 4.8,
+      "hostedConnectCount": 22,
+      "costLabel": "Free",
+      "latitude": 32.1,
+      "longitude": 34.795
+    },
+    {
+      "id": 11,
+      "categoryKey": "arts",
+      "subcategoryName": "Photography walk",
+      "title": "Photo walk through old Jaffa",
+      "publicAreaLabel": "Jaffa",
+      "distanceKilometers": 2.9,
+      "dayLabel": "Sat",
+      "startTimeLabel": "16:00",
+      "durationLabel": "2 h",
+      "attendeeCount": 8,
+      "capacity": 8,
+      "hostName": "Omri Levi",
+      "rating": 4.5,
+      "hostedConnectCount": 6,
+      "costLabel": "Free",
+      "latitude": 32.054,
+      "longitude": 34.752
+    },
+    {
+      "id": 12,
+      "categoryKey": "family",
+      "subcategoryName": "Playground",
+      "title": "Playground meetup for toddlers",
+      "publicAreaLabel": "Ramat Aviv",
+      "distanceKilometers": 4.1,
+      "dayLabel": "Sat",
+      "startTimeLabel": "10:00",
+      "durationLabel": "1 h 30 m",
+      "attendeeCount": 6,
+      "capacity": null,
+      "hostName": "Rivka Tal",
+      "rating": 4.9,
+      "hostedConnectCount": 13,
+      "isVerified": true,
+      "costLabel": "Free",
+      "latitude": 32.112,
+      "longitude": 34.796
+    },
+    {
+      "id": 13,
+      "categoryKey": "gaming",
+      "subcategoryName": "Tabletop RPG",
+      "title": "One-shot D&D table, two seats left",
+      "publicAreaLabel": "Florentin",
+      "distanceKilometers": 0.7,
+      "dayLabel": "Sun",
+      "startTimeLabel": "19:30",
+      "durationLabel": "4 h",
+      "attendeeCount": 4,
+      "capacity": 6,
+      "hostName": "Ronen Peled",
+      "rating": 4.6,
+      "hostedConnectCount": 15,
+      "costLabel": "Free",
+      "latitude": 32.0585,
+      "longitude": 34.769,
+      "requiresApproval": true
+    },
+    {
+      "id": 14,
+      "categoryKey": "outdoors",
+      "subcategoryName": "Dog walk",
+      "title": "Evening dog walk along the port",
+      "publicAreaLabel": "Namal",
+      "distanceKilometers": 3.1,
+      "dayLabel": "Sun",
+      "startTimeLabel": "18:30",
+      "durationLabel": "1 h",
+      "attendeeCount": 5,
+      "capacity": null,
+      "hostName": "Efrat Gil",
+      "rating": 4.8,
+      "hostedConnectCount": 18,
+      "costLabel": "Free",
+      "latitude": 32.096,
+      "longitude": 34.774
+    }
+  ],
+  "detailsByConnectId": {
+    "1": {
+      "description": "Regular Tuesday game, same crowd most weeks, and we are two short tonight. Half-pitch, rolling subs, nobody keeps score after the first ten minutes. Turn up ten minutes early if you want a proper warm-up.",
+      "whatToBring": "A dark shirt and a light one — we sort teams on the spot. Boots or trainers both fine on this surface. Water; the fountain by the car park has been broken for a month.",
+      "venueName": "Park HaYarkon, pitch 3",
+      "meetingInstructions": "The gate beside the tennis courts, not the main entrance. Look for the lime kit bag.",
+      "pricing": {
+        "costType": "split",
+        "totalAmount": 200,
+        "amountPerPerson": 20,
+        "expenseDescription": "the pitch"
+      }
+    },
+    "2": {
+      "description": "Three of us play most weeks and one dropped out. Standard Catan, no expansions, we explain the rules properly if you have never played. Beer in the fridge, cat on the sofa.",
+      "whatToBring": "Nothing. If you want something specific to drink, bring it — otherwise there is beer and mint tea.",
+      "venueName": "Flat 4, Florentin",
+      "meetingInstructions": "Ring the buzzer marked Shalev. Third floor, no lift, sorry.",
+      "pricing": {
+        "costType": "free"
+      }
+    },
+    "3": {
+      "description": "Indoor bouldering, mostly V2 to V5. We are not a class — everyone works their own problems and we spot each other. Good session if you have been climbing a few months and want people to climb with.",
+      "whatToBring": "Shoes if you own them, otherwise rental is ₪25 at the desk. Chalk gets shared.",
+      "venueName": "Yad Eliyahu climbing gym",
+      "meetingInstructions": "By the shoe rental desk at the entrance.",
+      "pricing": {
+        "costType": "ticketed",
+        "amountPerPerson": 65
+      }
+    },
+    "4": {
+      "description": "Chungking Express then Fallen Angels, projected onto the wall of my roof. Starts once it is properly dark. Subtitles in English.",
+      "whatToBring": "A cushion or a folding chair — the roof is concrete. Something to share if you feel like it.",
+      "venueName": "Rooftop, Kerem HaTeimanim",
+      "meetingInstructions": "The blue door on the corner, then all the way up the stairs.",
+      "pricing": {
+        "costType": "free"
+      }
+    },
+    "5": {
+      "description": "Easy 6 km along the water and back, conversational pace, nobody gets dropped. We leave at 06:45 sharp because some of us start work at eight.",
+      "whatToBring": "Just yourself. There is a water fountain at the turnaround point.",
+      "venueName": "Gordon Beach promenade",
+      "meetingInstructions": "The lifeguard tower at the top of the ramp.",
+      "pricing": {
+        "costType": "free"
+      }
+    },
+    "6": {
+      "description": "Slow vinyasa on the grass, about an hour, suitable if you have done a few classes before. Dana teaches; the rest of us just show up.",
+      "whatToBring": "A mat, or a towel if you do not have one. The grass is soft enough either way.",
+      "venueName": "Old North, the lawn by the playground",
+      "meetingInstructions": "The bench under the big ficus.",
+      "pricing": {
+        "costType": "split",
+        "totalAmount": 180,
+        "amountPerPerson": 15,
+        "expenseDescription": "the teacher fee"
+      }
+    },
+    "7": {
+      "description": "Half an hour of Hebrew, half an hour of Spanish, then whoever wants to stay stays. All levels — the beginners table is usually the loudest one.",
+      "whatToBring": "Nothing. Buy a coffee if you can, the café lets us take over the back room.",
+      "venueName": "Café in Neve Tzedek",
+      "meetingInstructions": "Back room, look for the table with the little flags on it.",
+      "pricing": {
+        "costType": "free"
+      }
+    },
+    "8": {
+      "description": "Four stops down Rothschild, starting early enough to get a seat. We move as a group but nobody minds if you peel off after two.",
+      "whatToBring": "ID. Two of the stops card everyone at the door.",
+      "venueName": "Rothschild Boulevard",
+      "meetingInstructions": "Outside Port Said, by the record crates.",
+      "pricing": {
+        "costType": "own"
+      }
+    },
+    "9": {
+      "description": "Bring whatever you are stuck on — side project, work thing, something you are learning. Quiet for the first two hours, then it gets social. Some of us just read.",
+      "whatToBring": "Laptop and a charger. There are only four sockets, so a short extension lead earns you friends.",
+      "venueName": "Sarona, the co-working lounge",
+      "meetingInstructions": "Ground floor lounge, ask for the Connect table at reception.",
+      "pricing": {
+        "costType": "free"
+      }
+    },
+    "10": {
+      "description": "Blanket on the grass, watch the sun go down over the river, go home at a reasonable hour. Kids and dogs both welcome.",
+      "whatToBring": "Something to share and something to sit on. Somebody always forgets a bottle opener.",
+      "venueName": "Park HaYarkon, the lawn by the boat rental",
+      "meetingInstructions": "The willow tree between the boat rental and the bridge.",
+      "pricing": {
+        "costType": "free"
+      }
+    },
+    "11": {
+      "description": "Two hours wandering old Jaffa while the light is good, stopping wherever people want to shoot. Not a workshop — nobody is teaching, we just walk and photograph.",
+      "whatToBring": "Whatever camera you have, phone included. Comfortable shoes; the stones are uneven.",
+      "venueName": "Old Jaffa",
+      "meetingInstructions": "The clock tower, by the steps on the south side.",
+      "pricing": {
+        "costType": "free"
+      }
+    },
+    "12": {
+      "description": "Toddlers run around, parents drink coffee and talk to adults for an hour. Ages roughly one to four. No structure whatsoever.",
+      "whatToBring": "Snacks for your own child, and a spare set of clothes — the sandpit is the sandpit.",
+      "venueName": "Ramat Aviv playground",
+      "meetingInstructions": "The benches by the small slide.",
+      "pricing": {
+        "costType": "free"
+      }
+    },
+    "13": {
+      "description": "One-shot adventure, pre-made characters, roughly four hours including a break. Built for people who have never played a tabletop RPG before but are curious.",
+      "whatToBring": "Nothing at all. Dice and character sheets are provided.",
+      "venueName": "Flat above the bakery, Florentin",
+      "meetingInstructions": "Side entrance on the alley, second floor.",
+      "pricing": {
+        "costType": "free"
+      }
+    },
+    "14": {
+      "description": "Easy hour along the port with the dogs, one coffee stop halfway. Friendly dogs only, and everyone stays on a lead near the boardwalk.",
+      "whatToBring": "Water for your dog and bags. There is a tap by the coffee kiosk.",
+      "venueName": "Tel Aviv Port",
+      "meetingInstructions": "The kiosk at the north end of the boardwalk.",
+      "pricing": {
+        "costType": "free"
+      }
+    }
+  },
+  "attendeeRoster": [
+    {
+      "name": "Noa Berkovich",
+      "role": "Host",
+      "initials": "NB",
+      "avatarBackgroundColor": "#d9c7f0"
+    },
+    {
+      "name": "Ari Shulman",
+      "role": "Joined Monday",
+      "initials": "AS",
+      "avatarBackgroundColor": "#c8f24a"
+    },
+    {
+      "name": "Maya Adler",
+      "role": "Joined Monday",
+      "initials": "MA",
+      "avatarBackgroundColor": "#f6c9d8"
+    },
+    {
+      "name": "Tal Ravid",
+      "role": "Joined Tuesday",
+      "initials": "TR",
+      "avatarBackgroundColor": "#bfe3e8"
+    },
+    {
+      "name": "Eitan Mor",
+      "role": "Joined Tuesday",
+      "initials": "EM",
+      "avatarBackgroundColor": "#f2dda6"
+    },
+    {
+      "name": "Dana Peretz",
+      "role": "Joined today",
+      "initials": "DP",
+      "avatarBackgroundColor": "#c9d8f5"
+    },
+    {
+      "name": "Guy Almog",
+      "role": "Joined today",
+      "initials": "GA",
+      "avatarBackgroundColor": "#d5ecc9"
+    },
+    {
+      "name": "Lior Kaplan",
+      "role": "Invited by Noa",
+      "initials": "LK",
+      "avatarBackgroundColor": "#f0cdbb"
+    }
+  ],
+  "confirmedAttendees": [
+    {
+      "name": "Noa Berkovich",
+      "role": "Host",
+      "initials": "NB",
+      "avatarBackgroundColor": "#d9c7f0"
+    },
+    {
+      "name": "Tal Ravid",
+      "role": "Joined Monday",
+      "initials": "TR",
+      "avatarBackgroundColor": "#bfe3e8"
+    },
+    {
+      "name": "Eitan Mor",
+      "role": "Joined Monday",
+      "initials": "EM",
+      "avatarBackgroundColor": "#f2dda6"
+    },
+    {
+      "name": "Dana Peretz",
+      "role": "Joined Tuesday",
+      "initials": "DP",
+      "avatarBackgroundColor": "#c9d8f5"
+    },
+    {
+      "name": "Guy Almog",
+      "role": "Joined Tuesday",
+      "initials": "GA",
+      "avatarBackgroundColor": "#d5ecc9"
+    },
+    {
+      "name": "Lior Kaplan",
+      "role": "Joined today",
+      "initials": "LK",
+      "avatarBackgroundColor": "#f0cdbb"
+    }
+  ],
+  "pendingRequests": [
+    {
+      "name": "Ari Shulman",
+      "initials": "AS",
+      "avatarBackgroundColor": "#c8f24a",
+      "isVerified": true,
+      "summary": "96% attendance · 14 Connects joined · 0.8 km away",
+      "note": "Played here last month with Tal. Can bring a ball."
+    },
+    {
+      "name": "Roni Bar-Lev",
+      "initials": "RB",
+      "avatarBackgroundColor": "#f6c9d8",
+      "isVerified": false,
+      "summary": "89% attendance · 6 Connects joined · 1.4 km away",
+      "note": ""
+    },
+    {
+      "name": "Omri Levi",
+      "initials": "OL",
+      "avatarBackgroundColor": "#f2dda6",
+      "isVerified": true,
+      "summary": "100% attendance · 22 Connects joined · 2.1 km away",
+      "note": "First time with this group — happy to go in goal."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+export const mapViewCopy = {
+  unableToLoadAzureMapsPleaseRetry: "Unable to load Azure Maps. Please retry.",
+  unableToAcquireAMapToken: "Unable to acquire a map token.",
+  theMapCouldNotBeLoadedPleaseTryAgain: "The map could not be loaded. Please try again.",
+  unableToInitializeAzureMaps: "Unable to initialize Azure Maps.",
+  open: (title: string | number) => "Open " + String(title) + "",
+  connectMap: "Connect map",
+  locationSymbol: "\u2316",
+  mapUnavailable: "Map unavailable",
+  theMapCouldNotBeLoadedMeetingDetailsAre: "The map could not be loaded. Meeting details are available below.",
+  theMapCouldNotBeLoadedYouCanStill: "The map could not be loaded. You can still explore Connects in the list.",
+  retryMap: "Retry map",
+  loadingAzureMaps: "Loading Azure Maps...",
+  categories: "Categories",
+} as const
