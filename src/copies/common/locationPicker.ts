@@ -10,7 +10,7 @@ export const locationPickerCopy = {
   lookingUpPlaces: "Looking up places...",
   retrySearch: "Retry search",
   noMatchingPlacesTryACityOrADifferent: "No matching places. Try a city or a different address.",
-  separator: ", ",
+  commaSeparatorWithSpace: ", ",
   pinConfirmed: "\u00b7 Pin confirmed",
   confirmThisMeetingArea: "\u00b7 Confirm this meeting area",
   changeConfirmation: "Change confirmation",

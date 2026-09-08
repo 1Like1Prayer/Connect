@@ -44,7 +44,7 @@ export const storeCopy = {
   thisConnectIsFullIncreaseCapacityOrFreeA: "This Connect is full. Increase capacity or free a spot first.",
   requestApproved: "Request approved",
   requestDeclined: "Request declined",
-  isOnTheList: (value0: string | number) => "" + String(value0) + " is on the list.",
+  isOnTheList: (name: string | number) => "" + String(name) + " is on the list.",
   requestDeclined2: "Request declined.",
   joinThisConnectBeforeSendingAMessage: "Join this Connect before sending a message.",
   thisChatIsReadOnlyBecauseTheConnectHas: "This chat is read-only because the Connect has ended or was cancelled.",

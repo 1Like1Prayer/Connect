@@ -13,5 +13,5 @@ export async function apiGet<T>(path: string, schema: z.ZodType<T>, signal?: Abo
   return parsed.data
 }
 export const mapTokenSchema = z.object({ token: z.string().min(1) })
-export const locationSchema = z.object({ label: z.string(), lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+export const locationSchema = z.object({ label: z.string(), latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })
 export const locationResultsSchema = z.object({ results: z.array(locationSchema) })

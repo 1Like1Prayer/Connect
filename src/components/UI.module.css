@@ -1,0 +1,42 @@
+.button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:10px 17px;border:1.5px solid var(--border-color);border-radius:999px;background:var(--panel);color:var(--text-color);font-size:13px;font-weight:650;line-height:1.25;cursor:pointer;text-decoration:none;transition:background .14s,transform .14s;flex-shrink:0}
+.button:hover:not(:disabled){background:var(--hover-background);transform:translateY(-1px)}
+.button:disabled{opacity:.5;cursor:not-allowed}
+.primary{background:var(--lime);color:#14181d;border-color:#14181d;box-shadow:3px 3px 0 #14181d}
+.primary:hover:not(:disabled){background:#d7fc78}
+.dark{background:#14181d;color:#f6f7f9;border-color:#14181d;box-shadow:3px 3px 0 #c8f24a}
+.dark:hover:not(:disabled){background:#30363e}
+.danger{background:#b52c69;color:#fff;border-color:#b52c69}
+.danger:hover:not(:disabled){background:#9c2358}
+.ghost{background:transparent;border-color:var(--subtle-border-color);box-shadow:none;color:var(--secondary-text)}
+.panel{background:var(--panel);border:1.5px solid var(--border-color);border-radius:16px;padding:20px;min-width:0}
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:17px;min-width:0}
+.field>label{font-size:13px;font-weight:650;line-height:1.35}
+.field small{font-size:12px;line-height:1.5;color:var(--secondary-text)}
+.input{width:100%;min-width:0;padding:13px 14px;background:var(--panel);border:1.5px solid var(--border-color);border-radius:12px;color:var(--text-color);font:inherit;font-size:14px}
+.error{color:var(--alert-color);font-size:12px;line-height:1.4}
+.avatar{border-radius:999px;border:1.5px solid #14181d;color:#14181d;display:inline-flex;align-items:center;justify-content:center;font-weight:750;font-size:12px;flex-shrink:0;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.badge{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--subtle-border-color);border-radius:999px;padding:5px 9px;font-size:11px;font-weight:650;line-height:1.3;background:var(--panel)}
+.badgeActive{background:var(--pink);color:#14181d;border-color:transparent}
+.category{display:inline-flex;gap:6px;align-items:center;font-size:12px;font-weight:700}
+.toggleRow{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:15px 0;border-bottom:1px solid var(--subtle-border-color)}
+.toggleRow.withoutDivider{border-bottom:0}
+.toggleRow label{font-size:14px;font-weight:650;cursor:pointer}
+.toggleRow p{font-size:12px;color:var(--secondary-text);margin:6px 0 0;line-height:1.5;max-width:60ch}
+.toggle{appearance:none;width:42px;height:24px;padding:0;margin:0;border:1.5px solid var(--border-color);border-radius:99px;background:var(--hover-background);position:relative;cursor:pointer;flex-shrink:0;transition:background .15s}
+.toggle:before{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:var(--text-color);top:50%;left:2.5px;transform:translateY(-50%);transition:transform .15s}
+.toggle:checked{background:#c8f24a;border-color:#14181d}
+.toggle:checked:before{transform:translate(18px,-50%);background:#14181d}
+.toggle:disabled{opacity:.45;cursor:not-allowed}
+.empty{max-width:500px;margin:0 auto;padding:56px 20px;text-align:center}
+.empty h2{font-size:26px;margin:22px 0 10px}
+.empty p{font-size:14px;color:var(--secondary-text);line-height:1.6;margin-bottom:22px}
+.emptyArt{height:80px;border:1.5px dashed var(--subtle-border-color);border-radius:12px;background:repeating-linear-gradient(135deg,var(--hover-background) 0 8px,transparent 8px 16px)}
+.modal{border:1.5px solid var(--border-color);border-radius:20px;padding:0;width:min(520px,calc(100% - 32px));max-height:calc(100dvh - 48px);background:var(--background);color:var(--text-color);box-shadow:8px 8px 0 var(--lime);overflow:auto}
+.modal::backdrop{background:#14181dbf}
+.modalBody{padding:28px}
+.modalHeading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
+.modalHeading h2{font-size:26px;line-height:1.15;margin:0}
+.placeholder{display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;color:var(--secondary-text);background:var(--hover-background);min-height:100px;font-size:12px;text-align:center;padding:16px}
+.placeholder svg{opacity:.65}
+@media(max-width:600px){.button{min-height:42px}.panel{padding:16px}.modalBody{padding:22px}.toggleRow{gap:14px}}
