@@ -24,6 +24,12 @@ signup/signin, followed by Connect's own profile onboarding. Connect retains
 birth date, gender, interests, location, photo, and privacy preferences in its
 application database. It does not own passwords.
 
+**First-release scale:** 10-100 users. Use one small production environment,
+one backend application, one PostgreSQL server, and basic managed services.
+Do not introduce enterprise infrastructure or distributed subsystems for
+unmeasured future demand. Production correctness still requires real
+authentication, server-side privacy, transactions, backups, and visible errors.
+
 The current domain name is **Connect** (`Connect`, `connectId`, `connects`).
 This document uses matching names for proposed API resources and database
 tables; "gathering" in explanatory prose describes the same product entity.
@@ -66,7 +72,7 @@ promotion, verified physical attendance, or an AI recommendation system.
 ## 2. System shape
 
 Use a **modular monolith**: one versioned application API, one relational
-database, and background processing from the same backend codebase. Hosting,
+database, and two small timer functions in the same backend application. Hosting,
 participation, privacy, and alerts share transactions; separate microservices
 would make those existing flows harder to implement correctly.
 
@@ -76,14 +82,14 @@ would make those existing flows harder to implement correctly.
 | --- | --- | --- |
 | Web application | Existing React, TypeScript, Vite SPA on Azure Static Web Apps | Independently addressable client routes; no server-rendering requirement |
 | Application API | Node.js/TypeScript Azure Functions, v4 programming model, HTTP triggers | Bounded queries and commands; shared language and Zod contracts |
-| Background processing | Timer-triggered worker in the backend Function app | Durable reminder and notification work must survive closed browsers |
+| Background processing | One notification timer and one cleanup timer in the same Function app | Durable work without a broker or separate worker deployment |
 | Transactional data | Azure Database for PostgreSQL Flexible Server with PostGIS | Membership uniqueness, capacity transactions, spatial filtering, relational profiles |
 | Database access | `pg`, explicit repositories, versioned SQL migrations | Transactions need a single acquired connection and visible lock boundaries |
 | Authentication | Microsoft Entra External ID customer tenant | Approved Microsoft-hosted signup/signin |
 | Maps | Azure Maps Web SDK and server-side search/token integration | Existing map and location-picker contracts |
 | Profile images | Private Azure Blob Storage with controlled application reads | Existing optional image upload, without database data URLs |
 | Application email | Azure Communication Services Email | Existing notification preferences, with actual delivery handled asynchronously |
-| Operations | Application Insights, managed identities, Key Vault where necessary | Trace API/worker failures without embedding credentials or private content |
+| Operations | Application Insights and managed identity; Key Vault only if an actual remaining secret requires it | Basic error visibility and credential-free service access |
 
 A standalone Functions origin preserves the existing `VITE_API_BASE_URL`
 contract. Do not assume a Static Web Apps API proxy. Flex Consumption is a
@@ -303,7 +309,7 @@ DTOs each screen needs.
 | `blocks` | Unique blocker/blocked pair; prohibit self-blocking |
 | `reports` | Reporter, target kind/ID, reason, details, operational status, timestamps |
 | `media` | Owner, blob reference, validated type/size, processing state |
-| `outbox`, `notification_jobs` | Durable event/delivery work, recipient, entity version, scheduling, lease and retry state |
+| `notification_jobs` | One PostgreSQL-backed transactional outbox/job table for notifications and reminders |
 | `idempotency_records`, `audit_events` | Command deduplication and protected operational history |
 
 Use foreign keys, uniqueness constraints, check constraints, and transaction
@@ -815,9 +821,12 @@ configuration decisions, not timing guarantees already implemented.
 
 ### 11.3 Reliable background work
 
-Write domain events/outbox work and immediate in-app results in the originating
-transaction. A worker claims due work using leases and `FOR UPDATE SKIP LOCKED`,
-then commits the claim before contacting a provider.
+Write immediate recipient alerts and `notification_jobs` in the originating
+transaction. For 10-100 users, select recipients and insert their jobs directly;
+do not add a separate event bus, outbox-dispatch stage, or fan-out service.
+`notification_jobs` itself is the transactional outbox. The single notification
+timer claims due work using leases and `FOR UPDATE SKIP LOCKED`, then commits
+the claim before contacting a provider.
 
 Delivery is at least once. Deduplicate logical jobs and use provider-supported
 idempotency where available; do not promise exactly-once email. Record
@@ -994,7 +1003,7 @@ application data deletion.
 
 | Current implementation | Connected implementation |
 | --- | --- |
-| `demoLogin` or locally completed profile | Entra authentication plus server onboarding status |
+| `loadSampleProfile` or locally completed profile | Entra authentication plus server onboarding status |
 | `connect-state-v2` Connect/profile arrays | Authorized API queries and durable database records |
 | Local store mutation as the final result | Validated transactional command and authoritative response |
 | Session-only hosting draft | Owner-scoped explicit server save with optimistic version |
@@ -1098,6 +1107,17 @@ authentication is not required to retain Connect's own onboarding data.
 
 ### 17.1 What "production ready" means here
 
+The sizing assumption is **10-100 users for the first iteration**, not
+thousands of concurrent clients. Optimize for a small team that can understand,
+deploy, and operate the complete system.
+
+The default is one Functions app, one small PostgreSQL server without HA/read
+replicas, one storage account with separate containers, hosted Entra auth,
+Maps, low-volume email, and basic monitoring. No Kubernetes, Redis, Service
+Bus, APIM, Front Door/WAF, multi-region failover, separate admin application,
+permanent build-runner VM, generic workflow engine, or Graph lifecycle service
+is required for this iteration.
+
 Implement every required function, migration, resource connection, and
 operational workflow in the following sections. A frontend flow is not complete
 merely because its HTTP route exists: authorization, private projections,
@@ -1123,19 +1143,18 @@ Keep references and public identifiers in it, not secret values.
 
 | Input | Constraint or required decision |
 | --- | --- |
-| `environment` | `dev`, `staging`, or `prod`; independent databases, identities, storage, and auth registrations |
+| `environment` | One `prod` environment initially; local development uses isolated data and auth configuration. Add a separately provisioned staging environment only when needed |
 | `subscriptionId`, `workloadTenantId` | Explicit Azure subscription and its resource/workload identity tenant |
 | `customerTenantId`, `customerAuthority`, `customerApiAudience` | Entra External ID customer tenant; independently configured from the workload tenant |
-| `operatorTenantId`, `operatorApiAudience` | Trusted workforce tenant/API for operations; never accept customer tokens as operator tokens |
 | `resourceRegion`, `dataResidencyRegion` | Supported service intersection, residency approval, and a documented exception for any differently located service |
 | `namePrefix`, `uniqueSuffix`, resource-group names | Stable per environment, Azure naming rules, globally unique names where required |
 | `webOrigin`, `apiOrigin`, registered callback/logout URIs | Exact HTTPS production origins and owned DNS zones/domains |
 | `vnetAddressSpace`, subnet prefixes, DNS integration | Non-overlapping with any existing connected networks; capacity for planned scale |
-| `productionLoadProfile` | Peak concurrent users, API requests/second, active chat polling, message volume, stored data and email/day |
+| `productionLoadProfile` | 10-100 users initially; measure active chat polling and email/day rather than size for hypothetical enterprise traffic |
 | `monthlyBudget`, operational owner | Budget alert thresholds and who can approve a capacity/quota increase |
 | `availabilityTarget`, `RPO`, `RTO` | Business-approved objectives; not a promise inferred from an Azure SKU |
 | `emailDomain`, `senderAddress`, DNS owner | Verified application sender and a responsible owner for DNS and deliverability |
-| `pipelineProvider`, repository and environment approvers | One CI/CD implementation with federated identity and protected production approvals |
+| `pipelineProvider`, repository and environment approvers | One simple pipeline with federated identity and a production approval; no permanent private runner unless later necessary |
 | `legalAgePolicy`, `ageCalculationTimeZone` | Minimum registration age, restricted-activity policy, leap-day handling, and geographic scope |
 | `retentionPolicyVersion`, `deletionPolicyVersion` | Approved retention periods, exceptions, deletion grace period and completion deadline |
 | `notificationPolicyVersion`, `reminderOffsetsMinutes` | Essential versus optional messages and approved reminder schedules |
@@ -1184,9 +1203,9 @@ configured trusted Azure ingress.
 
 ### 18.1 Schema conventions
 
-Use an application schema named `connect_app`. Operational tables may reside
-in `connect_ops` to support narrower database grants. The table names below
-are unqualified for readability.
+Use one application schema named `connect_app`. The table names below are
+unqualified for readability. Separate runtime and migration/administrator
+database roles without introducing another database or operational service.
 
 Notation: `?` means nullable; all other columns are `NOT NULL`. `PK`, `FK` and
 `UQ` mean primary key, foreign key and unique constraint. `M` adds
@@ -1227,7 +1246,7 @@ erDiagram
     ACCOUNTS ||--o{ MEDIA : owns
     ACCOUNTS ||--o{ BLOCKS : initiates
     ACCOUNTS ||--o{ REPORTS : files
-    OUTBOX ||--o{ NOTIFICATION_JOBS : produces
+    ACCOUNTS ||--o{ NOTIFICATION_JOBS : receives
 ```
 
 The diagram shows domain relationships, not cascading-delete instructions.
@@ -1243,7 +1262,7 @@ Deletion is defined separately and must not erase another member's history.
 | `profiles` (M) | `account_id uuid`, `name varchar(80)`, `username varchar(24)`, `username_key text GENERATED ALWAYS AS (lower(username)) STORED`, `contact_email varchar(254)`, `contact_email_verified_at timestamptz?`, `contact_email_version bigint DEFAULT 1`, `phone_number varchar(30)?`, `gender text DEFAULT 'unspecified'`, `birth_date date?`, `birth_date_withheld boolean DEFAULT false`, `biography varchar(500) DEFAULT ''`, `location_label varchar(100) DEFAULT ''`, `share_email boolean DEFAULT false`, `share_phone boolean DEFAULT false`, `share_gender boolean DEFAULT false`, `share_age boolean DEFAULT false`, `avatar_media_id uuid?` | PK/FK account; UQ username key; username 3-24 ASCII letters/digits/underscore; name trimmed length 2-80; gender `unspecified`, `woman`, `man`; FK avatar with same-owner enforcement |
 | `member_preferences` (M) | `account_id uuid`, `default_radius_km smallint DEFAULT 5`, `email_enabled boolean DEFAULT true`, `reminders_enabled boolean DEFAULT true`, `messages_enabled boolean DEFAULT true` | PK/FK account; radius 1-100; baseline values preserve current form defaults and must pass the approved notification-consent policy |
 | `profile_interests` (A) | `account_id uuid`, `category_key text` | Composite PK; FK account and category; onboarding requires 2-9 choices, editing permits 0-9 |
-| `contact_verifications` (A) | `id uuid`, `account_id uuid`, `email_version bigint`, `token_digest bytea`, `expires_at timestamptz`, `attempt_count smallint DEFAULT 0`, `consumed_at timestamptz?`, `invalidated_at timestamptz?` | PK ID; FK account; UQ token digest; binds verification to current contact-email version; one unconsumed active challenge per account/version through a partial unique index |
+| `contact_verifications` (A) | `id uuid`, `account_id uuid`, `email_version bigint`, `token_digest bytea`, `expires_at timestamptz`, `attempt_count smallint DEFAULT 0`, `send_status text`, `provider_operation_id text?`, `consumed_at timestamptz?`, `invalidated_at timestamptz?` | PK ID; FK account; UQ token digest; binds verification to current contact-email version; one unconsumed active challenge per account/version through a partial unique index |
 
 Profile writes reset consent atomically when contacts change. An email edit
 also clears its verification timestamp, increments `contact_email_version`,
@@ -1313,12 +1332,10 @@ host-only pending/waitlist endpoint or returning an unbounded attendee array.
 | Table | Columns in addition to convention | Keys and essential rules |
 | --- | --- | --- |
 | `media` (M) | `id uuid`, `owner_account_id uuid`, `blob_name text`, `content_type text`, `size_bytes integer`, `width integer`, `height integer`, `content_digest bytea`, `state text`, `expires_at timestamptz?` | PK; FK owner; UQ blob name and `(id, owner_account_id)`; state `pending|ready|rejected|superseded|deleted`; only ready same-owner media can become an avatar |
-| `outbox` (A) | `id uuid`, `aggregate_type text`, `aggregate_id uuid`, `aggregate_version bigint`, `event_type text`, `payload jsonb`, `available_at timestamptz`, `status text DEFAULT 'pending'`, `attempt_count integer DEFAULT 0`, `lease_token uuid?`, `leased_until timestamptz?`, `processed_at timestamptz?`, `last_error_code text?` | PK; UQ logical event identity; payload contains versioned safe references; states `pending|leased|processed|failed` |
-| `notification_jobs` (M) | `id uuid`, `event_id uuid`, `recipient_account_id uuid`, `connect_id uuid?`, `connect_version bigint?`, `contact_email_version bigint?`, `channel text`, `template_key text`, `payload jsonb`, `secret_payload_ciphertext bytea?`, `key_version_uri text?`, `dedupe_key text`, `not_before timestamptz`, `expires_at timestamptz?`, `state text`, `attempt_count integer DEFAULT 0`, `lease_token uuid?`, `leased_until timestamptz?`, `provider_operation_id text?`, `provider_message_id text?`, `provider_status text?`, `last_error_code text?` | PK/FKs; UQ dedupe key; state `pending|leased|submitted|accepted|suppressed|failed|unknown`; provider acceptance is not inbox delivery |
-| `maintenance_jobs` (M) | `id uuid`, `kind text`, `subject_account_id uuid?`, `related_account_id uuid?`, `event_id uuid`, `cursor jsonb`, `state text`, `attempt_count integer`, `available_at timestamptz`, `lease_token uuid?`, `leased_until timestamptz?`, `last_error_code text?` | PK/FKs; UQ `(kind, event_id)`; kinds include block/suspension reconciliation, media cleanup and retention; bounded, restartable batches |
-| `account_deletion_requests` (M) | `id uuid`, `account_id uuid`, `identity_digest bytea`, `policy_version text`, `requested_at timestamptz`, `execute_after timestamptz`, `state text`, `provider_deletion_state text`, `completed_at timestamptz?`, `last_error_code text?` | PK/FK account; one open request per account; unique identity digest while tombstoned; application deletion and provider deletion tracked separately |
+| `notification_jobs` (M) | `id uuid`, `event_id uuid`, `recipient_account_id uuid`, `connect_id uuid?`, `connect_version bigint?`, `contact_email_version bigint?`, `kind text`, `template_key text`, `safe_parameters jsonb`, `dedupe_key text`, `not_before timestamptz`, `expires_at timestamptz?`, `state text`, `attempt_count integer DEFAULT 0`, `lease_token uuid?`, `leased_until timestamptz?`, `provider_operation_id text?`, `provider_message_id text?`, `provider_status text?`, `last_error_code text?` | PK/FKs; UQ dedupe key; kind `email|reminder`; state `pending|leased|submitted|accepted|suppressed|failed|unknown`; this table is the outbox; no credential/token payloads |
+| `account_deletion_requests` (M) | `id uuid`, `account_id uuid`, `identity_digest bytea`, `policy_version text`, `requested_at timestamptz`, `execute_after timestamptz`, `state text`, `provider_deletion_state text`, `completed_at timestamptz?`, `last_error_code text?` | PK/FK account; one open request per account; deletion is performed by the named operator using a repeatable admin procedure, not a new identity service |
 | `idempotency_records` (A) | `actor_account_id uuid`, `operation text`, `key text`, `request_digest bytea`, `command_id uuid`, `resource_id uuid?`, `result_code text`, `expires_at timestamptz` | Composite PK `(actor_account_id, operation, key)`; stores outcome references, not replayable private DTOs |
-| `audit_events` (A) | `id uuid`, `actor_account_id uuid?`, `operator_issuer text?`, `operator_subject text?`, `action text`, `target_type text`, `target_id uuid?`, `request_id text`, `safe_metadata jsonb` | PK; customer actor or validated operator identity; append-only to runtime role; do not log secret/request-body contents |
+| `audit_events` (A) | `id uuid`, `actor_account_id uuid?`, `operator_identity text?`, `action text`, `target_type text`, `target_id uuid?`, `request_id text`, `safe_metadata jsonb` | PK; customer actor or authenticated admin-command identity; append-only to runtime role; do not log secret/request-body contents |
 | `rate_limit_buckets` | `key_digest bytea`, `route_class text`, `window_start timestamptz`, `request_count integer`, `expires_at timestamptz` | Composite PK on digest/class/window; atomic increment; bounded short-lived retention |
 | `schema_migrations` | `version text`, `checksum text`, `applied_at timestamptz`, `release_id text` | PK version; deployment role only; fail on changed checksum |
 
@@ -1393,8 +1410,7 @@ the identity policy listed below before domain code runs.
 
 Actor codes: `G` guest-safe read with optional valid customer token; `I`
 authenticated non-deleted account including onboarding; `M` completed active
-member; `H` owning host; `J` confirmed participant; `O` separately trusted
-operator. Account-deletion status/cancel endpoints additionally allow the
+member; `H` owning host; `J` confirmed participant. Account-deletion status/cancel endpoints additionally allow the
 requesting `deletion_pending` account. `H` and `J` also require active account
 policy; historical read exceptions are explicit, not permission bypasses.
 
@@ -1467,46 +1483,41 @@ All columns describe server behavior, not trusted client assertions.
 | `saveConnectFeedback` | `PUT /connects/{id}/feedback` M | Stars, optional attendance + version -> own feedback | Joined non-host, completed non-cancelled Connect; upsert unique rating |
 | `createReport` | `POST /reports` M | Exactly one target, reason/details, key -> report receipt | Validate access/target; record report/audit; no automatic punishment |
 | `listMyBlocks` | `GET /me/blocks` M | Cursor -> owner block list | No unrelated relationships |
-| `blockMember` | `PUT /me/blocks/{memberId}` M | Target -> result/operation | Lock pair, insert block/policy versions, queue bounded membership reconciliation; deny access immediately |
+| `blockMember` | `PUT /me/blocks/{memberId}` M | Target -> result | Lock pair and affected Connects in order; insert block and revoke reciprocal hosted participation transactionally; no separate reconciliation service |
 | `unblockMember` | `DELETE /me/blocks/{memberId}` M | Target -> 204 | Remove relation/update policy; never restore attendance |
-| `startContactVerification` | `POST /me/contact-verification` I | Current contact version, key -> generic accepted operation | Rate-limit; challenge digest + encrypted delivery job; onboarding may first save contact to its draft |
-| `completeContactVerification` | `POST /me/contact-verification/complete` I | Challenge ID/token -> verified contact state | Atomic attempt/expiry/version/owner check; consume once |
-| `requestAccountDeletion` | `POST /me/deletion` M | Explicit confirmation/version/key -> `Operation` | Freeze account, record approved grace/policy, queue access reconciliation and safe notice |
+| `startContactVerification` | `POST /me/contact-verification` M | Current contact version, key -> accepted/failed/unknown send status | Persist token digest, send through ACS outside transaction with token only in memory; explicit resend invalidates the previous challenge |
+| `completeContactVerification` | `POST /me/contact-verification/complete` M | Challenge ID/token -> verified contact state | Atomic attempt/expiry/version/owner check; consume once |
+| `requestAccountDeletion` | `POST /me/deletion` M | Explicit confirmation/version/key -> `Operation` | Mark deletion pending and hide protected access; record operator-owned request and safe notice |
 | `getAccountDeletion` | `GET /me/deletion` I | None -> own operation | Also allowed for own deletion-pending account |
 | `cancelAccountDeletion` | `POST /me/deletion/cancel` I | Request/version -> account state | Only within grace, before irreversible execution; never restores cancelled Connects or lost attendance automatically |
 | `getMapsToken` | `GET /maps/token` G | None -> existing token contract | Shared abuse checks; least-privileged short-lived provider capability |
 | `searchLocations` | `GET /locations/search` G | Bounded `q` -> label/latitude/longitude results | Provider adapter deadline, throttling and schema validation |
 | `getLiveness` | `GET /health/live` G | None -> minimal up status | No identity/config/database details |
-| `getReadiness` | `GET /ops/health/ready` O | None -> dependency readiness | Bounded DB/schema/config checks; deployment evidence, not a public diagnostic dump |
+| `getReadiness` | `GET /health/ready` G | None -> minimal ready/not-ready status | Bounded DB/schema/config checks; no dependency names or diagnostics; rate-limit and cache the check briefly |
 
-The contact-verification service must support a versioned contact record
-during onboarding without creating an active profile early. Store that
-contact version in the validated onboarding draft and bind its challenge;
-completion transfers its verification state only when the address/version
-matches. Alternatively complete onboarding before verification. The chosen
-implementation must not write to a nonexistent `profiles` row or claim that
-the email is verified merely because onboarding finished.
+Contact verification happens **after** profile completion. The member can use
+Connect through their authenticated Entra identity while the application
+contact address is unverified; application email is withheld until verified.
+This avoids a second partial-contact model inside onboarding.
 
-### 19.4 Operator functions
+### 19.4 Small-team administration
 
-Operator APIs use a separate issuer/audience/app-role policy on `/ops/*`.
-Customer `roles` claims are never sufficient. An operator-facing console or
-authenticated runbook client must exist before launch; the hidden UI-kit
-toolbar is not this console.
+For 10-100 users, do not build an admin web application, an `/ops` API, or a
+second application-authentication system. Provide a small, parameterized
+`server\admin` command-line tool using the same domain services and an
+explicitly authorized operator's database identity. Record operator identity,
+reason and outcome in `audit_events`.
 
-| Function | Route | Required role and behavior |
-| --- | --- | --- |
-| `listReports`, `getReport` | `GET /ops/reports`, `GET /ops/reports/{id}` | `Connect.Moderator`; minimum necessary evidence, paginated, audited access |
-| `resolveReport` | `POST /ops/reports/{id}/decision` | `Connect.Moderator`; resolution/reason/version, append audit; no implied sanction |
-| `changeAccountStatus` | `POST /ops/accounts/{id}/status` | `Connect.Moderator`; active/suspended change with reason, policy bump, bounded reconciliation |
-| `moderateConnect` | `POST /ops/connects/{id}/visibility` | `Connect.Moderator`; hide/restore independent of host cancellation, audit and current policy |
-| `listFailedJobs`, `retryJob` | `GET /ops/jobs`, `POST /ops/jobs/{id}/retry` | `Connect.Operator`; sanitized errors and fenced/idempotent retry; ambiguous sends need investigation |
-| `recordIdentityDeletion` | `POST /ops/deletions/{id}/identity-result` | `Connect.IdentityOperator`; record verified provider operation outcome, never accept a customer's assertion of provider deletion |
+Required commands are: list/resolve reports, suspend/restore an account,
+hide/restore a Connect, inspect/retry failed notification jobs, and
+process/record account deletion. They are not public HTTP functions. The
+hidden preview toolbar has no administrative authority.
 
-Do not grant the ordinary customer API identity broad Graph directory-write
-permissions to support these operations. Application-account suspension is a
-Connect policy change; provider user deletion uses a separately consented and
-audited identity-lifecycle integration or operator procedure.
+The responsible owner handles occasional Entra user deletion through the
+External ID administration portal and records the outcome in the application
+deletion request. No Graph directory-write permission is granted to the
+runtime managed identity. This is a deliberately manual, documented process
+with an owner and deadline, not an unimplemented promise of automated deletion.
 
 ### 19.5 Timer functions and job contracts
 
@@ -1516,14 +1527,8 @@ punctuality. A delayed/missed tick must catch up without duplicating results.
 
 | Function | Initial trigger | Work and completion condition |
 | --- | --- | --- |
-| `dispatchOutbox` | `*/30 * * * * *` | Lease committed events; expand safe recipient alerts/jobs with unique logical keys; mark event processed only after durable expansion |
-| `deliverNotificationJobs` | `*/30 * * * * *` | Lease due jobs; recheck event-specific eligibility/preferences/contact version; initiate provider operation outside DB transaction |
-| `pollEmailOperations` | `0 * * * * *` | Resume submitted provider operations by stored ID; record accepted/failure/unknown without equating accepted to delivered |
-| `reconcileAccessPolicies` | `*/30 * * * * *` | Process block/suspension/deletion fan-out in bounded Connect-ID batches; checkpoint progress and retry safely |
-| `reconcileReminderSchedules` | `0 */5 * * * *` | Repair missing/stale jobs against active Connect versions and approved reminder offsets; uniqueness prevents duplicate schedules |
-| `processAccountDeletions` | `0 */5 * * * *` | Process due approved deletion stages; never mark complete until application data and provider identity outcomes meet policy |
-| `expireOperationalData` | `0 15 2 * * *` | Bounded expiry of drafts/challenges/limiter buckets/idempotency/jobs under retention and legal holds |
-| `cleanupMedia` | `0 */10 * * * *` | Delete abandoned/superseded blobs only after reference/owner/state recheck; finish tombstone state |
+| `processNotifications` | `0 * * * * *` | Claim due email/reminder jobs, recheck policy, initiate provider operations or poll existing operation IDs; record accepted/failure/unknown. New/changed attendance and Connect commands create/reschedule reminder rows directly |
+| `cleanupExpiredData` | `0 15 2 * * *` | Bounded expiry of drafts/challenges/limiter buckets/idempotency/jobs plus abandoned/superseded media; recheck references and honor approved retention/holds |
 
 Enable timer schedule monitoring for schedules where supported and appropriate.
 Host storage is mandatory for timer coordination; database leases and
@@ -1533,19 +1538,21 @@ active during rollback.
 
 ### 19.6 Event dictionary
 
-Each event has `{ eventId, schemaVersion, type, aggregateId,
+An event here is command metadata, not a separate event-bus deployment or
+mandatory `outbox` table. Each has `{ eventId, schemaVersion, type, aggregateId,
 aggregateVersion, actorReference, occurredAt, safeReferences }`. Do not put
 full private DTOs in it.
 
 | Event family | Writer | Durable consumers |
 | --- | --- | --- |
-| `connect.published`, `connect.updated`, `connect.cancelled` | Host transaction | Alert expansion, reminder planning/rescheduling/cancellation |
+| `connect.published`, `connect.updated`, `connect.cancelled` | Host transaction | Direct alert/job inserts and reminder planning/rescheduling/cancellation |
 | `participation.joined`, `.requested`, `.waitlisted`, `.approved`, `.declined`, `.left`, `.removed` | Participation transaction | Member/host result alerts and optional delivery; safe terminal outcomes survive removal |
 | `message.created` | Message transaction | Other confirmed members' optional message notifications |
-| `profile.contact_changed`, `contact.verification_requested` | Profile/verification transaction | Suppression of old-version jobs and new verification delivery |
-| `member.blocked`, `account.suspended`, `account.deletion_requested` | Policy transaction | Immediate policy denial plus membership/media/deletion reconciliation |
-| `media.superseded`, `report.created` | Media/report transaction | Blob cleanup or restricted moderation work |
+| `profile.contact_changed` | Profile transaction | Invalidate verification and suppress old-version email jobs |
+| `member.blocked`, `account.suspended`, `account.deletion_requested` | Policy transaction | Immediate policy denial and audited membership changes or operator-owned deletion request |
+| `media.superseded`, `report.created` | Media/report transaction | State for daily cleanup or the owner's report review |
 
-Keep a schema-versioned event registry and contract tests. Outbox dispatch
-replays old supported event versions during rolling upgrades; an unknown
-version fails visibly rather than being discarded.
+Keep the job/template payload schema versioned. The notification timer must
+understand outstanding supported payloads across releases; an unknown version
+fails visibly rather than being discarded. Do not add event sourcing, replay
+infrastructure, or per-feature worker services.
