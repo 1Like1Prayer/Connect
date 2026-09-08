@@ -13,6 +13,12 @@ session-scoped Zustand state, interactive forms, and optional Azure Maps service
 contracts. There is no implemented application backend, database, or real
 authentication integration in this repository.
 
+**How to implement from this document:** sections 1-16 explain the product and
+flow boundaries. Sections 17 onward specify the production implementation:
+deployment inputs, physical data model, function contracts, Azure resources,
+configuration, provisioning, and release evidence. These are design contracts,
+not evidence that resources or backend code have already been created.
+
 **Confirmed authentication decision:** Microsoft-hosted **Entra External ID**
 signup/signin, followed by Connect's own profile onboarding. Connect retains
 birth date, gender, interests, location, photo, and privacy preferences in its
@@ -1087,3 +1093,459 @@ authentication is not required to retain Connect's own onboarding data.
 - [Create customer signup/signin user flows](https://learn.microsoft.com/en-us/entra/external-id/customers/how-to-user-flow-sign-up-sign-in-customers)
 - [Choose browser-delegated or native authentication](https://learn.microsoft.com/en-us/entra/external-id/customers/concept-choose-authentication-approach)
 - [Access tokens and API validation responsibilities](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens)
+
+## 17. Implementation baseline and required inputs
+
+### 17.1 What "production ready" means here
+
+Implement every required function, migration, resource connection, and
+operational workflow in the following sections. A frontend flow is not complete
+merely because its HTTP route exists: authorization, private projections,
+transactional updates, asynchronous consequences, and failure handling must
+also work. Infrastructure deployment alone is not application readiness.
+
+The architecture has three kinds of decisions:
+
+| Kind | Treatment by a future implementation or provisioning task |
+| --- | --- |
+| Confirmed product contract | Preserve it: Entra-hosted auth, Connect onboarding, current participation/visibility/cost semantics |
+| Recommended technical baseline | Implement the stated starting value; make it configurable and validate it under the intended workload |
+| Required deployment/policy input | Stop the applicable production release step when absent; never silently select a tenant, region, budget, legal policy, or production recipient |
+
+Do not replace a missing prerequisite with a public database, a connection
+string checked into code, a fabricated notification, or a disabled permission
+check.
+
+### 17.2 Deployment input manifest
+
+Create a validated environment manifest before generating production IaC.
+Keep references and public identifiers in it, not secret values.
+
+| Input | Constraint or required decision |
+| --- | --- |
+| `environment` | `dev`, `staging`, or `prod`; independent databases, identities, storage, and auth registrations |
+| `subscriptionId`, `workloadTenantId` | Explicit Azure subscription and its resource/workload identity tenant |
+| `customerTenantId`, `customerAuthority`, `customerApiAudience` | Entra External ID customer tenant; independently configured from the workload tenant |
+| `operatorTenantId`, `operatorApiAudience` | Trusted workforce tenant/API for operations; never accept customer tokens as operator tokens |
+| `resourceRegion`, `dataResidencyRegion` | Supported service intersection, residency approval, and a documented exception for any differently located service |
+| `namePrefix`, `uniqueSuffix`, resource-group names | Stable per environment, Azure naming rules, globally unique names where required |
+| `webOrigin`, `apiOrigin`, registered callback/logout URIs | Exact HTTPS production origins and owned DNS zones/domains |
+| `vnetAddressSpace`, subnet prefixes, DNS integration | Non-overlapping with any existing connected networks; capacity for planned scale |
+| `productionLoadProfile` | Peak concurrent users, API requests/second, active chat polling, message volume, stored data and email/day |
+| `monthlyBudget`, operational owner | Budget alert thresholds and who can approve a capacity/quota increase |
+| `availabilityTarget`, `RPO`, `RTO` | Business-approved objectives; not a promise inferred from an Azure SKU |
+| `emailDomain`, `senderAddress`, DNS owner | Verified application sender and a responsible owner for DNS and deliverability |
+| `pipelineProvider`, repository and environment approvers | One CI/CD implementation with federated identity and protected production approvals |
+| `legalAgePolicy`, `ageCalculationTimeZone` | Minimum registration age, restricted-activity policy, leap-day handling, and geographic scope |
+| `retentionPolicyVersion`, `deletionPolicyVersion` | Approved retention periods, exceptions, deletion grace period and completion deadline |
+| `notificationPolicyVersion`, `reminderOffsetsMinutes` | Essential versus optional messages and approved reminder schedules |
+
+The deployment pipeline must check quotas, available SKUs/versions, private
+networking support, domain control, role-assignment rights, and required Entra
+administrator consent before making the environment public.
+
+### 17.3 Suggested configurable guardrails
+
+These are conservative starting settings, not measured capacity guarantees.
+Tune them through the release workload scenarios and provider quotas.
+
+| Setting | Initial technical recommendation |
+| --- | --- |
+| JSON request size | 64 KiB, except the separately bounded avatar upload |
+| Avatar upload | 1 MiB file; decoded image at most 16 megapixels; reject unsupported or oversized decoding |
+| Collection page size | Default 25, maximum 100; roster, messages, alerts and management lists are independently paginated |
+| Visible chat polling | 5 seconds while visible; pause in hidden tabs, exponential backoff up to 60 seconds on transient failures |
+| Ordinary API deadline | 15 seconds; expensive work becomes a durable job instead of increasing this indefinitely |
+| Database acquisition/query/transaction budget | 2 seconds acquire, 5 seconds statement, 10 seconds transaction; 2 seconds lock timeout |
+| PostgreSQL pool per process | Maximum 5 connections initially; validate the aggregate budget before selecting app scale limits |
+| Provider HTTP deadline | 5 seconds for Maps; 10 seconds per email-provider operation request |
+| Job claim | At most 25 jobs per batch; 2-minute lease; heartbeat before half the lease elapses |
+| Transient job retry | Exponential backoff with jitter, maximum 8 attempts; exhausted or ambiguous work remains visible to operators |
+| Client command idempotency | Retain deduplication records at least 24 hours; long-lived provider jobs retain their own dedupe identity |
+| Contact verification | 32 cryptographically random token bytes, 30-minute validity, at most 5 attempts, at most 3 sends per account/hour |
+| Abuse limiter | Shared enforcement across instances; privacy-preserving caller keys and short-lived counters |
+
+Configure rate budgets per route class, not one universal limit. A starting
+policy is 60 public search requests/IP/minute, 20 Maps token requests/IP/minute,
+30 message sends/member/minute, and 10 join/publication mutations/member/minute.
+These are abuse controls, not usage entitlements; account for shared NAT
+addresses, accessibility retries, and the actual Maps/email provider quotas.
+Return `429` and `Retry-After`, not a misleading successful response.
+
+For an initial single-database deployment, short-lived PostgreSQL
+`rate_limit_buckets` provide shared atomic counters without introducing Redis.
+Use bounded expiry cleanup and hashed/HMAC-derived keys, not stored raw IPs.
+Protect connection capacity under abusive ingress; an edge/WAF control is
+required if the measured public exposure can exhaust the database limiter.
+Do not trust forwarded client-IP headers unless they come through the
+configured trusted Azure ingress.
+
+## 18. Physical database specification
+
+### 18.1 Schema conventions
+
+Use an application schema named `connect_app`. Operational tables may reside
+in `connect_ops` to support narrower database grants. The table names below
+are unqualified for readability.
+
+Notation: `?` means nullable; all other columns are `NOT NULL`. `PK`, `FK` and
+`UQ` mean primary key, foreign key and unique constraint. `M` adds
+`created_at timestamptz DEFAULT now()`, `updated_at timestamptz DEFAULT now()`,
+and `version bigint DEFAULT 1 CHECK (version > 0)`. `A` adds only
+`created_at timestamptz DEFAULT now()`. Mutable tables explicitly marked `M`
+use version checks for client edits; worker lease updates use lease tokens.
+
+UUIDs are server-generated. Never accept a caller-selected actor/owner ID.
+Use `text` plus named `CHECK` constraints for evolving state codes rather
+than PostgreSQL enum types that complicate rolling schema migrations.
+Serialize timestamps as UTC ISO 8601, dates as `YYYY-MM-DD`, and identifiers
+as strings. JSONB is limited to explicitly versioned, validated document
+payloads; it is not a substitute for relational membership or authorization.
+
+### 18.2 Entity relationships
+
+```mermaid
+erDiagram
+    ACCOUNTS ||--o{ EXTERNAL_IDENTITIES : authenticates_as
+    ACCOUNTS ||--o| PROFILES : completes
+    ACCOUNTS ||--o| ONBOARDING_DRAFTS : resumes
+    ACCOUNTS ||--|| MEMBER_PREFERENCES : configures
+    ACCOUNTS ||--o{ PROFILE_INTERESTS : selects
+    CATEGORIES ||--o{ PROFILE_INTERESTS : classifies
+    CATEGORIES ||--o{ SUBCATEGORIES : contains
+    ACCOUNTS ||--o{ CONNECTS : hosts
+    CONNECTS ||--|| CONNECT_LOCATIONS : locates
+    CONNECTS ||--|{ CONNECT_SUBCATEGORIES : categorizes
+    SUBCATEGORIES ||--o{ CONNECT_SUBCATEGORIES : selected_by
+    CONNECTS ||--|{ PARTICIPATIONS : includes
+    ACCOUNTS ||--o{ PARTICIPATIONS : participates
+    CONNECTS ||--o{ MESSAGES : contains
+    ACCOUNTS ||--o{ MESSAGES : authors
+    CONNECTS ||--o{ CONNECT_FEEDBACK : receives
+    ACCOUNTS ||--o{ CONNECT_FEEDBACK : submits
+    ACCOUNTS ||--o{ ALERTS : receives
+    ACCOUNTS ||--o{ MEDIA : owns
+    ACCOUNTS ||--o{ BLOCKS : initiates
+    ACCOUNTS ||--o{ REPORTS : files
+    OUTBOX ||--o{ NOTIFICATION_JOBS : produces
+```
+
+The diagram shows domain relationships, not cascading-delete instructions.
+Deletion is defined separately and must not erase another member's history.
+
+### 18.3 Identity and profile tables
+
+| Table | Columns in addition to convention | Keys and essential rules |
+| --- | --- | --- |
+| `accounts` (M) | `id uuid`, `status text DEFAULT 'onboarding'`, `onboarding_completed_at timestamptz?`, `policy_version bigint DEFAULT 1`, `deleted_at timestamptz?` | PK `id`; status is `onboarding`, `active`, `suspended`, `deletion_pending`, or `deleted`; `policy_version` increments on authorization-affecting changes |
+| `external_identities` (A) | `id uuid`, `account_id uuid`, `issuer text`, `subject text`, `provider_object_id text?`, `last_authenticated_at timestamptz` | PK `id`; FK account; UQ `(issuer, subject)`; provider object ID is recorded only from a validated provider claim when needed for lifecycle operations |
+| `onboarding_drafts` (M) | `account_id uuid`, `schema_version integer`, `stage smallint`, `values jsonb`, `expires_at timestamptz` | PK/FK account; stage 0-5; values must exclude password, tokens, provider claims and unsupported fields; completion deletes the draft transactionally |
+| `profiles` (M) | `account_id uuid`, `name varchar(80)`, `username varchar(24)`, `username_key text GENERATED ALWAYS AS (lower(username)) STORED`, `contact_email varchar(254)`, `contact_email_verified_at timestamptz?`, `contact_email_version bigint DEFAULT 1`, `phone_number varchar(30)?`, `gender text DEFAULT 'unspecified'`, `birth_date date?`, `birth_date_withheld boolean DEFAULT false`, `biography varchar(500) DEFAULT ''`, `location_label varchar(100) DEFAULT ''`, `share_email boolean DEFAULT false`, `share_phone boolean DEFAULT false`, `share_gender boolean DEFAULT false`, `share_age boolean DEFAULT false`, `avatar_media_id uuid?` | PK/FK account; UQ username key; username 3-24 ASCII letters/digits/underscore; name trimmed length 2-80; gender `unspecified`, `woman`, `man`; FK avatar with same-owner enforcement |
+| `member_preferences` (M) | `account_id uuid`, `default_radius_km smallint DEFAULT 5`, `email_enabled boolean DEFAULT true`, `reminders_enabled boolean DEFAULT true`, `messages_enabled boolean DEFAULT true` | PK/FK account; radius 1-100; baseline values preserve current form defaults and must pass the approved notification-consent policy |
+| `profile_interests` (A) | `account_id uuid`, `category_key text` | Composite PK; FK account and category; onboarding requires 2-9 choices, editing permits 0-9 |
+| `contact_verifications` (A) | `id uuid`, `account_id uuid`, `email_version bigint`, `token_digest bytea`, `expires_at timestamptz`, `attempt_count smallint DEFAULT 0`, `consumed_at timestamptz?`, `invalidated_at timestamptz?` | PK ID; FK account; UQ token digest; binds verification to current contact-email version; one unconsumed active challenge per account/version through a partial unique index |
+
+Profile writes reset consent atomically when contacts change. An email edit
+also clears its verification timestamp, increments `contact_email_version`,
+invalidates previous challenges, and suppresses obsolete email jobs. Validate
+date and phone semantics in shared contracts. Database checks additionally
+forbid shared age without a supplied/non-withheld date, shared phone without
+a number, and shared gender when unspecified.
+
+Do not persist Entra passwords or signin tokens in these tables. Contact-email
+verification is application data, not an attempt to change Entra credentials.
+
+### 18.4 Catalog, Connects, and drafts
+
+| Table | Columns in addition to convention | Keys and essential rules |
+| --- | --- | --- |
+| `categories` | `key text`, `sort_order smallint`, `enabled boolean DEFAULT true` | PK key; UQ order; seed the nine approved stable keys, not user-defined categories |
+| `subcategories` | `key text`, `category_key text`, `sort_order smallint`, `enabled boolean DEFAULT true` | PK key; FK category; UQ `(key, category_key)` and `(category_key, sort_order)`; display names remain in centralized copy |
+| `connects` (M) | `id uuid`, `host_id uuid`, `category_key text`, `title varchar(100)`, `description varchar(3000) DEFAULT ''`, `what_to_bring varchar(500) DEFAULT ''`, `other_description varchar(500) DEFAULT ''`, `starts_at timestamptz`, `ends_at timestamptz`, `time_zone text`, `creation_mode text`, `location_type text`, `location_visibility text DEFAULT 'public'`, `capacity bigint?`, `join_policy text DEFAULT 'instant'`, `visibility text DEFAULT 'everyone'`, `is_guest_list_private boolean DEFAULT false`, `skill_level text DEFAULT 'open'`, `age_min smallint?`, `age_max smallint?`, `required_gender text?`, `cost_type text DEFAULT 'free'`, `cost_amount_minor integer DEFAULT 0`, `currency char(3) DEFAULT 'ILS'`, `status text DEFAULT 'published'`, `moderation_state text DEFAULT 'visible'`, `cancellation_reason varchar(500)?` | PK ID; FK host/category; UQ `(id, category_key)` for taxonomy FK; title 5-100; end after start; host ID immutable; moderation independent of host cancellation |
+| `connect_subcategories` | `connect_id uuid`, `category_key text`, `subcategory_key text` | PK `(connect_id, subcategory_key)`; composite FKs `(connect_id, category_key)` and `(subcategory_key, category_key)` enforce the same parent |
+| `connect_locations` (M) | `connect_id uuid`, `public_area_label text`, `public_point geography(Point,4326)?`, `exact_venue text?`, `exact_point geography(Point,4326)?`, `meeting_instructions varchar(500) DEFAULT ''`, `meeting_notes varchar(500) DEFAULT ''` | PK/FK Connect; points use longitude/latitude order when constructed; physical mode requires both points; nonphysical modes require both null |
+| `hosting_drafts` (M) | `id uuid`, `owner_account_id uuid`, `slot text`, `connect_id uuid?`, `schema_version integer`, `values jsonb`, `stage smallint`, `furthest_stage smallint`, `base_connect_version bigint?`, `expires_at timestamptz` | PK ID; FKs owner/Connect; UQ `(owner_account_id, slot)`; slot is `new` or the owned Connect ID; stages 0-7 and furthest at least current; no participant rows |
+
+Named checks enforce creation mode `now|later`, location type
+`physical|online|undecided`, visibility `everyone|link_only`, location visibility
+`public|private`, join policy `instant|approval`, and skill
+`open|beginner|intermediate|advanced`. Private meeting details require approval.
+Finite capacity is 1-9007199254740991; null means unlimited and is not a
+different queue policy. Monetary amounts are 0-100000000 minor units; free/own
+require zero and split/ticketed require a positive amount. Age limits are
+nonnegative, ordered when both present, and supported by the configured age
+policy. `required_gender` is null or a supported requirement code.
+
+Validate maximum provider-label length through the provider adapter; use a
+bounded 500-character service contract for `exact_venue` and public labels
+derived from it. A host-entered private public-area label remains 2-100
+characters. Do not silently truncate an address into a different place.
+
+Publication requires at least one valid subcategory, one location record, and
+the host's joined participation. Enforce cross-row invariants through
+transactional services and deferred constraint triggers where SQL checks
+cannot express them. In particular, a capacity edit or membership write must
+lock the Connect before counting confirmed rows. Do not use a drift-prone
+client-supplied `confirmed_count`.
+
+### 18.5 Participation and community tables
+
+| Table | Columns in addition to convention | Keys and essential rules |
+| --- | --- | --- |
+| `participations` (M) | `connect_id uuid`, `account_id uuid`, `state text`, `request_note varchar(500) DEFAULT ''`, `queue_sequence bigint GENERATED ALWAYS AS IDENTITY`, `joined_at timestamptz?` | Composite PK and FKs; state `joined|pending|waitlist`; joined timestamp iff joined; host remains joined; index for each state and queue order |
+| `participation_events` (A) | `id uuid`, `connect_id uuid`, `subject_account_id uuid`, `actor_account_id uuid?`, `event_type text`, `previous_state text?`, `resulting_state text?`, `command_id uuid`, `connect_version bigint` | PK; FKs; audit outcomes include withdrawal/decline/removal; do not store reusable private request bodies in event payloads |
+| `messages` (A) | `id uuid`, `sequence bigint GENERATED ALWAYS AS IDENTITY`, `connect_id uuid`, `author_account_id uuid`, `text varchar(2000)`, `redacted_at timestamptz?` | PK ID; UQ sequence; FKs; trimmed nonempty text before redaction; author/timestamp server-owned; allocate sequence after the Connect lock so commits cannot be missed by per-room forward polling |
+| `connect_feedback` (M) | `connect_id uuid`, `rater_account_id uuid`, `stars smallint`, `attendance_feedback text?` | Composite PK/FKs; stars 1-5; feedback null, `all`, or `no_show`; host derived from Connect, never caller-supplied |
+| `alerts` (A) | `id uuid`, `recipient_account_id uuid`, `connect_id uuid?`, `event_id uuid`, `kind text`, `template_key text`, `safe_parameters jsonb`, `read_at timestamptz?` | PK; FKs; UQ `(recipient_account_id, event_id, kind)`; parameters exclude protected location/message text; read state owned by recipient |
+| `blocks` (A) | `blocker_account_id uuid`, `blocked_account_id uuid`, `event_id uuid` | Composite PK/FKs; not self; reverse-pair index; policy checks both directions for reciprocal hosted participation |
+| `reports` (M) | `id uuid`, `reporter_account_id uuid`, `target_account_id uuid?`, `target_connect_id uuid?`, `reason_code text`, `details varchar(1000) DEFAULT ''`, `status text DEFAULT 'open'`, `resolution_code text?`, `resolved_at timestamptz?` | PK/FKs; exactly one target; status `open|triaged|resolved|dismissed`; customer writes cannot set operational fields |
+
+Removing participation does not cascade-delete messages, feedback, reports,
+or historical audit. Completed participation is retained unless a documented
+safety/deletion workflow changes its visibility or pseudonymizes the member.
+
+Public roster and management lists are distinct projections. Paginate a
+public roster through a separate read endpoint rather than exposing the
+host-only pending/waitlist endpoint or returning an unbounded attendee array.
+
+### 18.6 Media, jobs, and operational tables
+
+| Table | Columns in addition to convention | Keys and essential rules |
+| --- | --- | --- |
+| `media` (M) | `id uuid`, `owner_account_id uuid`, `blob_name text`, `content_type text`, `size_bytes integer`, `width integer`, `height integer`, `content_digest bytea`, `state text`, `expires_at timestamptz?` | PK; FK owner; UQ blob name and `(id, owner_account_id)`; state `pending|ready|rejected|superseded|deleted`; only ready same-owner media can become an avatar |
+| `outbox` (A) | `id uuid`, `aggregate_type text`, `aggregate_id uuid`, `aggregate_version bigint`, `event_type text`, `payload jsonb`, `available_at timestamptz`, `status text DEFAULT 'pending'`, `attempt_count integer DEFAULT 0`, `lease_token uuid?`, `leased_until timestamptz?`, `processed_at timestamptz?`, `last_error_code text?` | PK; UQ logical event identity; payload contains versioned safe references; states `pending|leased|processed|failed` |
+| `notification_jobs` (M) | `id uuid`, `event_id uuid`, `recipient_account_id uuid`, `connect_id uuid?`, `connect_version bigint?`, `contact_email_version bigint?`, `channel text`, `template_key text`, `payload jsonb`, `secret_payload_ciphertext bytea?`, `key_version_uri text?`, `dedupe_key text`, `not_before timestamptz`, `expires_at timestamptz?`, `state text`, `attempt_count integer DEFAULT 0`, `lease_token uuid?`, `leased_until timestamptz?`, `provider_operation_id text?`, `provider_message_id text?`, `provider_status text?`, `last_error_code text?` | PK/FKs; UQ dedupe key; state `pending|leased|submitted|accepted|suppressed|failed|unknown`; provider acceptance is not inbox delivery |
+| `maintenance_jobs` (M) | `id uuid`, `kind text`, `subject_account_id uuid?`, `related_account_id uuid?`, `event_id uuid`, `cursor jsonb`, `state text`, `attempt_count integer`, `available_at timestamptz`, `lease_token uuid?`, `leased_until timestamptz?`, `last_error_code text?` | PK/FKs; UQ `(kind, event_id)`; kinds include block/suspension reconciliation, media cleanup and retention; bounded, restartable batches |
+| `account_deletion_requests` (M) | `id uuid`, `account_id uuid`, `identity_digest bytea`, `policy_version text`, `requested_at timestamptz`, `execute_after timestamptz`, `state text`, `provider_deletion_state text`, `completed_at timestamptz?`, `last_error_code text?` | PK/FK account; one open request per account; unique identity digest while tombstoned; application deletion and provider deletion tracked separately |
+| `idempotency_records` (A) | `actor_account_id uuid`, `operation text`, `key text`, `request_digest bytea`, `command_id uuid`, `resource_id uuid?`, `result_code text`, `expires_at timestamptz` | Composite PK `(actor_account_id, operation, key)`; stores outcome references, not replayable private DTOs |
+| `audit_events` (A) | `id uuid`, `actor_account_id uuid?`, `operator_issuer text?`, `operator_subject text?`, `action text`, `target_type text`, `target_id uuid?`, `request_id text`, `safe_metadata jsonb` | PK; customer actor or validated operator identity; append-only to runtime role; do not log secret/request-body contents |
+| `rate_limit_buckets` | `key_digest bytea`, `route_class text`, `window_start timestamptz`, `request_count integer`, `expires_at timestamptz` | Composite PK on digest/class/window; atomic increment; bounded short-lived retention |
+| `schema_migrations` | `version text`, `checksum text`, `applied_at timestamptz`, `release_id text` | PK version; deployment role only; fail on changed checksum |
+
+Use a lease token as a fencing token: completion/heartbeat updates must match
+both job ID and the current token. An expired worker must not overwrite a
+new worker's result. A job in `unknown` after an ambiguous provider send is
+not blindly retried as a new email.
+
+### 18.7 Required indexes and read shapes
+
+| Access path | Required index or query strategy |
+| --- | --- |
+| Resolve authenticated account | UQ `external_identities(issuer, subject)`; index account FK; identity-deletion digest lookup |
+| Username lookup/claim | UQ `profiles(username_key)` |
+| Category/subcategory discovery | `connects(category_key, status, starts_at, id)`; `connect_subcategories(subcategory_key, connect_id)` |
+| Public active discovery | Partial index for `status='published' AND moderation_state='visible'`; put `ends_at > now()` in the query, not a time-dependent partial-index predicate |
+| Spatial filtering | GiST `connect_locations(public_point)`; `ST_DWithin` in meters, with exact points excluded from public sorting/filtering |
+| Text search | Parameterized normalized search document over public fields; initially PostgreSQL full-text/trigram indexes as appropriate to preserve substring matching; enable only selected supported extensions |
+| Host dashboard | `connects(host_id, status, starts_at, id)` |
+| My Connects and membership checks | `participations(account_id, state, connect_id)` plus its composite PK |
+| Requests/waitlist/confirmed count | `participations(connect_id, state, queue_sequence)` |
+| Chat paging | `messages(connect_id, sequence)`; author FK index for deletion/redaction |
+| Alert inbox/unread count | `alerts(recipient_account_id, created_at DESC, id)` and partial unread index where `read_at IS NULL` |
+| Ratings | `connect_feedback(connect_id)` and host aggregation through Connects; no writable aggregate cache initially |
+| Jobs | Partial due-work indexes over `(available_at/not_before, id)` for pending states, plus leased-until recovery indexes |
+| Moderation/expiry | Reports `(status, created_at, id)`; all expiring tables indexed by `expires_at` |
+
+Preserve current relevance weights in a tested shared scoring specification:
+selected interest +20, exact title +100 or title contains +60, subcategory
+match +45, category match +30, public area +15, host name +10. Database
+candidate filtering must not substitute incompatible full-text semantics for
+the current substring match. Bind values; never concatenate raw filters,
+identifiers, or sort directions into SQL.
+
+### 18.8 Migration and deletion discipline
+
+Apply migrations in this order: schemas/roles/extensions; accounts and catalog;
+profiles/preferences/media; Connects and locations; participation/community;
+outbox/operations; indexes and deferred invariants; deterministic catalog
+seeds. Resolve the profile/avatar FK after both tables exist. Seed stable keys,
+not sample profiles, Connects, messages, ratings, or passwords.
+
+Use explicit `RESTRICT` on durable account/Connect/history relationships.
+`CASCADE` is limited to subordinate data intentionally deleted with its
+parent, such as a discarded private draft or selected taxonomy join rows.
+The account-deletion worker deletes personal profile/draft/media records and
+pseudonymizes retained history under the approved policy; it does not issue
+a broad account-row cascade.
+
+Run one migration job using a PostgreSQL advisory lock, a migration-only
+identity, a checksum-verified artifact, and private network access. Use
+expand/backfill/contract migrations across releases. `CREATE INDEX
+CONCURRENTLY` requires an explicitly nontransactional migration step. A
+failed migration halts deployment; restoring an old executable must not imply
+automatically reversing a destructive data migration.
+
+## 19. Backend function and DTO implementation contract
+
+### 19.1 Common handler pipeline
+
+Every HTTP function follows:
+
+**Request ID -> size/rate limits -> route-bound identity validation ->
+account/onboarding/policy -> Zod input -> service transaction/query ->
+viewer-safe DTO -> stable response.**
+
+Register HTTP routes under the Functions `api` prefix with `v1/...` route
+templates; do not accidentally publish `/api/api/v1/...`. Function-key
+authorization is not member authentication. When Functions `authLevel` is
+`anonymous` to allow mixed guest/bearer routes, the shared handler must enforce
+the identity policy listed below before domain code runs.
+
+Actor codes: `G` guest-safe read with optional valid customer token; `I`
+authenticated non-deleted account including onboarding; `M` completed active
+member; `H` owning host; `J` confirmed participant; `O` separately trusted
+operator. Account-deletion status/cancel endpoints additionally allow the
+requesting `deletion_pending` account. `H` and `J` also require active account
+policy; historical read exceptions are explicit, not permission bypasses.
+
+Use `If-Match` for versioned writes and `Idempotency-Key` for retryable command
+creation. Standardize collection responses as
+`{ items, nextCursor, total?, asOf }`; `total` must use the same policy and
+filter scope. Large integer ordering keys are encoded as strings. A cursor
+is opaque, integrity-protected, bounded, and tied to the viewer/query context.
+
+### 19.2 Required response DTOs
+
+| DTO | Required content and exclusions |
+| --- | --- |
+| `Me` | Account ID/status, onboarding state/draft when incomplete, own profile, preferences, versions; no provider tokens/subject |
+| `MemberProfile` | Name/username/bio/authorized image, interests, permitted contact/demographic fields, visible activity pages and evidence-backed stats; no birth date |
+| `ConnectSummary` | Identity/category/subcategories, title, public place/distance, time/cost, safe host summary, counts, viewer attendance, visibility badges, version; no hidden names or exact location |
+| `ConnectDetail` | Summary plus authored details, permitted meeting data, roster visibility/count/first page, current viewer feedback and capabilities |
+| `HostParticipantPage` | Host-only selected state, member-safe identity, request note, eligibility outcome, queue position; no undisclosed DOB/gender |
+| `ParticipationResult` | Connect ID/version, current attendance state, counts, permitted actions, related operation status |
+| `ThreadSummary` | Connect ID/title, access state, safe latest snippet only for readers, archive state |
+| `MessagePage` | Ordered message IDs/sequences, author-safe display, text, server times and redaction state; no arbitrary account fields |
+| `AlertPage` | Recipient-owned safe alerts, unread count, current permitted destinations |
+| `Operation` | Operation ID, state, optional retry/poll location; never claim queued work has finished |
+
+Never expose a pending/waitlist note through a public roster DTO. The display
+adapter may preserve existing component props, but must not manufacture hidden
+fields or copy another viewer's cache.
+
+### 19.3 HTTP function catalog
+
+The names are proposed code/export names. Paths are relative to `/api/v1`.
+All columns describe server behavior, not trusted client assertions.
+
+| Function | Route and actor | Input -> output | Entities/transaction and consequences |
+| --- | --- | --- | --- |
+| `bootstrapAccount` | `POST /me/bootstrap` I | Valid Entra API token -> `Me` | Unique identity/account lookup/create plus default preferences; deny deletion tombstones |
+| `getMe` | `GET /me` I | None -> `Me` | Owner-only account/profile/draft/preferences query |
+| `saveOnboarding` | `PUT /me/onboarding` I | Partial values, stage, version -> saved draft/version | Own draft; allow only onboarding account; no activation |
+| `completeOnboarding` | `POST /me/onboarding/complete` I | Complete values + version/idempotency -> `Me` | Account/profile/interests/preferences/media ownership atomically; username conflict -> 409; delete draft |
+| `updateMyProfile` | `PATCH /me/profile` M | Editable allowlist + ETag -> own profile/version | Consent/email-version reset, verification invalidation, policy-version bump where needed |
+| `updatePreferences` | `PATCH /me/preferences` M | Radius/notification flags + ETag -> preferences/version | Persist flags; suppress obsolete optional jobs on send-time recheck |
+| `getMyAvatar` | `GET /me/avatar` I | Current reference -> safe image/404 | Own ready media; supports onboarding preview |
+| `uploadMyAvatar` | `POST /me/avatar` I | Bounded image + command key -> media reference/status | Media ownership, validation/blob workflow; no success before ready |
+| `deleteMyAvatar` | `DELETE /me/avatar` I | Current reference/version -> 204 | Detach profile/draft pointer, mark superseded and queue blob cleanup |
+| `getMember` | `GET /members/{id}` M | Member ID/cursors -> `MemberProfile` | Centralized member/activity projection |
+| `getMemberAvatar` | `GET /members/{id}/avatar` M | Member ID -> safe image/404 | Apply same member/visibility policy; never accept arbitrary blob name |
+| `getCatalog` | `GET /catalog` G | None -> catalog/version | Enabled stable taxonomy and option keys; cache only nonpersonal catalog data |
+| `searchConnects` | `POST /connects/search` G | Filters, center, timezone, cursor -> summary page | PostGIS plus all visibility/block filters before sorting/paging |
+| `getCategoryCounts` | `GET /categories/counts` G | Declared non-coordinate scope -> counts | Counts of visible active Connects; no hidden aggregate leakage |
+| `getConnect` | `GET /connects/{id}` G | ID -> `ConnectDetail`/404 | Viewer-safe data, capability and feedback projection |
+| `getConnectRoster` | `GET /connects/{id}/roster` G | ID/cursor -> permitted roster/count | No names if roster policy denies them; never pending/waitlist data |
+| `getHostingDraft` | `GET /me/hosting-drafts/{slot}` M | Slot -> draft/version or 404 | Owner and current host eligibility |
+| `saveHostingDraft` | `PUT /me/hosting-drafts/{slot}` M | Incomplete validated values/stages + ETag -> draft | Private slot uniqueness; record base Connect version |
+| `deleteHostingDraft` | `DELETE /me/hosting-drafts/{slot}` M | ETag -> 204 | Delete only the matching owned version |
+| `publishConnect` | `POST /connects` M | Complete host payload, optional draft version, key -> detail | Insert Connect/location/subcategories/host participation/outbox atomically |
+| `updateConnect` | `PATCH /connects/{id}` H | Editable values + ETag -> detail | Lock Connect; time/privacy/capacity checks; updated event, reminder reschedule |
+| `cancelConnect` | `POST /connects/{id}/cancel` H | Optional reason, version, key -> detail | Cancel plus participation cleanup/audit/recipient event atomically |
+| `joinConnect` | `POST /connects/{id}/participation` M | Optional note, key -> `ParticipationResult` | Account/policy and Connect locks; choose joined/pending/waitlist; create result/event |
+| `leaveConnect` | `DELETE /connects/{id}/participation` M | Own current participation -> result | Never host; active lifecycle; remove/audit and revoke access |
+| `listHostParticipants` | `GET /connects/{id}/participants` H | State/cursor -> host page | State-scoped counts/list; profile-safe projection |
+| `decideParticipation` | `POST /connects/{id}/participants/{memberId}/decision` H | `approve|decline`, key -> result | Recheck subject eligibility/capacity under locks; offer spot is immediate approval |
+| `removeParticipant` | `DELETE /connects/{id}/participants/{memberId}` H | Target/current version -> result | Remove confirmed non-host; audit/result event |
+| `getMyConnects` | `GET /me/connects` M | Tab/cursor -> summaries/counts | Matching Hosting/Joined/Invites/Past queries |
+| `getThreads` | `GET /me/threads` M | Cursor -> thread page | Locked shells for waiting members; latest messages only for readers |
+| `getMessages` | `GET /connects/{id}/messages` J | Before/after sequence, limit -> message page | Reauthorize every page; allow archived retained participants |
+| `sendMessage` | `POST /connects/{id}/messages` J | Trimmed text, key -> saved message | Lock active Connect, allocate sequence, insert message/outbox; no sends after end/cancel |
+| `getAlerts` | `GET /me/alerts` M | All/unread, cursor -> alert page | Recipient scope, safe destinations and unread count |
+| `markAlertRead` | `POST /me/alerts/{id}/read` M | ID -> read state/count | Update owned row only; idempotent |
+| `markAllAlertsRead` | `POST /me/alerts/read-all` M | None -> read state/count | Mark rows visible to the statement snapshot, not subsequently created alerts |
+| `saveConnectFeedback` | `PUT /connects/{id}/feedback` M | Stars, optional attendance + version -> own feedback | Joined non-host, completed non-cancelled Connect; upsert unique rating |
+| `createReport` | `POST /reports` M | Exactly one target, reason/details, key -> report receipt | Validate access/target; record report/audit; no automatic punishment |
+| `listMyBlocks` | `GET /me/blocks` M | Cursor -> owner block list | No unrelated relationships |
+| `blockMember` | `PUT /me/blocks/{memberId}` M | Target -> result/operation | Lock pair, insert block/policy versions, queue bounded membership reconciliation; deny access immediately |
+| `unblockMember` | `DELETE /me/blocks/{memberId}` M | Target -> 204 | Remove relation/update policy; never restore attendance |
+| `startContactVerification` | `POST /me/contact-verification` I | Current contact version, key -> generic accepted operation | Rate-limit; challenge digest + encrypted delivery job; onboarding may first save contact to its draft |
+| `completeContactVerification` | `POST /me/contact-verification/complete` I | Challenge ID/token -> verified contact state | Atomic attempt/expiry/version/owner check; consume once |
+| `requestAccountDeletion` | `POST /me/deletion` M | Explicit confirmation/version/key -> `Operation` | Freeze account, record approved grace/policy, queue access reconciliation and safe notice |
+| `getAccountDeletion` | `GET /me/deletion` I | None -> own operation | Also allowed for own deletion-pending account |
+| `cancelAccountDeletion` | `POST /me/deletion/cancel` I | Request/version -> account state | Only within grace, before irreversible execution; never restores cancelled Connects or lost attendance automatically |
+| `getMapsToken` | `GET /maps/token` G | None -> existing token contract | Shared abuse checks; least-privileged short-lived provider capability |
+| `searchLocations` | `GET /locations/search` G | Bounded `q` -> label/latitude/longitude results | Provider adapter deadline, throttling and schema validation |
+| `getLiveness` | `GET /health/live` G | None -> minimal up status | No identity/config/database details |
+| `getReadiness` | `GET /ops/health/ready` O | None -> dependency readiness | Bounded DB/schema/config checks; deployment evidence, not a public diagnostic dump |
+
+The contact-verification service must support a versioned contact record
+during onboarding without creating an active profile early. Store that
+contact version in the validated onboarding draft and bind its challenge;
+completion transfers its verification state only when the address/version
+matches. Alternatively complete onboarding before verification. The chosen
+implementation must not write to a nonexistent `profiles` row or claim that
+the email is verified merely because onboarding finished.
+
+### 19.4 Operator functions
+
+Operator APIs use a separate issuer/audience/app-role policy on `/ops/*`.
+Customer `roles` claims are never sufficient. An operator-facing console or
+authenticated runbook client must exist before launch; the hidden UI-kit
+toolbar is not this console.
+
+| Function | Route | Required role and behavior |
+| --- | --- | --- |
+| `listReports`, `getReport` | `GET /ops/reports`, `GET /ops/reports/{id}` | `Connect.Moderator`; minimum necessary evidence, paginated, audited access |
+| `resolveReport` | `POST /ops/reports/{id}/decision` | `Connect.Moderator`; resolution/reason/version, append audit; no implied sanction |
+| `changeAccountStatus` | `POST /ops/accounts/{id}/status` | `Connect.Moderator`; active/suspended change with reason, policy bump, bounded reconciliation |
+| `moderateConnect` | `POST /ops/connects/{id}/visibility` | `Connect.Moderator`; hide/restore independent of host cancellation, audit and current policy |
+| `listFailedJobs`, `retryJob` | `GET /ops/jobs`, `POST /ops/jobs/{id}/retry` | `Connect.Operator`; sanitized errors and fenced/idempotent retry; ambiguous sends need investigation |
+| `recordIdentityDeletion` | `POST /ops/deletions/{id}/identity-result` | `Connect.IdentityOperator`; record verified provider operation outcome, never accept a customer's assertion of provider deletion |
+
+Do not grant the ordinary customer API identity broad Graph directory-write
+permissions to support these operations. Application-account suspension is a
+Connect policy change; provider user deletion uses a separately consented and
+audited identity-lifecycle integration or operator procedure.
+
+### 19.5 Timer functions and job contracts
+
+Use six-field UTC NCRONTAB schedules. These initial cadences are configurable;
+all due-work selection uses persisted timestamps, not assumed invocation
+punctuality. A delayed/missed tick must catch up without duplicating results.
+
+| Function | Initial trigger | Work and completion condition |
+| --- | --- | --- |
+| `dispatchOutbox` | `*/30 * * * * *` | Lease committed events; expand safe recipient alerts/jobs with unique logical keys; mark event processed only after durable expansion |
+| `deliverNotificationJobs` | `*/30 * * * * *` | Lease due jobs; recheck event-specific eligibility/preferences/contact version; initiate provider operation outside DB transaction |
+| `pollEmailOperations` | `0 * * * * *` | Resume submitted provider operations by stored ID; record accepted/failure/unknown without equating accepted to delivered |
+| `reconcileAccessPolicies` | `*/30 * * * * *` | Process block/suspension/deletion fan-out in bounded Connect-ID batches; checkpoint progress and retry safely |
+| `reconcileReminderSchedules` | `0 */5 * * * *` | Repair missing/stale jobs against active Connect versions and approved reminder offsets; uniqueness prevents duplicate schedules |
+| `processAccountDeletions` | `0 */5 * * * *` | Process due approved deletion stages; never mark complete until application data and provider identity outcomes meet policy |
+| `expireOperationalData` | `0 15 2 * * *` | Bounded expiry of drafts/challenges/limiter buckets/idempotency/jobs under retention and legal holds |
+| `cleanupMedia` | `0 */10 * * * *` | Delete abandoned/superseded blobs only after reference/owner/state recheck; finish tombstone state |
+
+Enable timer schedule monitoring for schedules where supported and appropriate.
+Host storage is mandatory for timer coordination; database leases and
+idempotency are still required across deployments, retries and worker crashes.
+Prevent multiple production worker deployments from unintentionally becoming
+active during rollback.
+
+### 19.6 Event dictionary
+
+Each event has `{ eventId, schemaVersion, type, aggregateId,
+aggregateVersion, actorReference, occurredAt, safeReferences }`. Do not put
+full private DTOs in it.
+
+| Event family | Writer | Durable consumers |
+| --- | --- | --- |
+| `connect.published`, `connect.updated`, `connect.cancelled` | Host transaction | Alert expansion, reminder planning/rescheduling/cancellation |
+| `participation.joined`, `.requested`, `.waitlisted`, `.approved`, `.declined`, `.left`, `.removed` | Participation transaction | Member/host result alerts and optional delivery; safe terminal outcomes survive removal |
+| `message.created` | Message transaction | Other confirmed members' optional message notifications |
+| `profile.contact_changed`, `contact.verification_requested` | Profile/verification transaction | Suppression of old-version jobs and new verification delivery |
+| `member.blocked`, `account.suspended`, `account.deletion_requested` | Policy transaction | Immediate policy denial plus membership/media/deletion reconciliation |
+| `media.superseded`, `report.created` | Media/report transaction | Blob cleanup or restricted moderation work |
+
+Keep a schema-versioned event registry and contract tests. Outbox dispatch
+replays old supported event versions during rolling upgrades; an unknown
+version fails visibly rather than being discarded.
