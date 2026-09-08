@@ -932,9 +932,9 @@ contracts; the remaining routes below are proposed.
 | `GET /maps/token`, `GET /locations/search` | Existing Maps integration contracts |
 
 There are no Connect `/login`, `/password`, payment, invitation-delivery, or
-calendar-sync endpoints in this architecture. Profile-contact verification and
-account deletion require their own provider/operational contracts before those
-additional production flows are enabled.
+calendar-sync endpoints in this architecture. Profile-contact verification and account deletion are specified in sections
+19-20 as small additional production workflows. They are not credential
+management or a separate identity platform.
 
 ### 13.2 Request and response rules
 
@@ -1720,3 +1720,164 @@ Do not pretend cancellation restores already cancelled events or deleted
 content. A documented owner, completion deadline and resumable admin procedure
 are launch requirements; automated Graph deletion and an admin console are
 explicitly deferred.
+
+## 21. Minimal Azure resource inventory
+
+### 21.1 First-iteration resource choices
+
+The following is one small deployment for **10-100 users**. Child resources
+such as a database, container, DNS link or role assignment configure an
+existing service; they are not separate application services.
+
+| Resource family / ARM type | Initial choice | Purpose and dependency |
+| --- | --- | --- |
+| Resource group: `Microsoft.Resources/resourceGroups` | One production group | Keep the app's owned resources together; do not create a landing-zone hierarchy |
+| Static web app: `Microsoft.Web/staticSites` | Free for the initial pilot; Standard if an availability commitment requires its SLA | Hosts Vite `dist`; MSAL works with the standalone API without SWA built-in authentication |
+| Functions plan: `Microsoft.Web/serverfarms` | Linux Flex Consumption, `FC1` | One plan for one app; no always-ready instances initially |
+| Function app: `Microsoft.Web/sites` | One app, Functions runtime v4, supported Node.js LTS | HTTP functions plus `processNotifications` and `cleanupExpiredData`; same code/release |
+| Runtime identity: `Microsoft.ManagedIdentity/userAssignedIdentities` | One app identity | Managed service access; never an end-user identity or a SQL administrator |
+| Storage: `Microsoft.Storage/storageAccounts` | One `StorageV2`, Standard LRS | Host state, deployment packages and avatar blobs in separate containers; HTTPS, anonymous blob access disabled |
+| Blob containers: `Microsoft.Storage/storageAccounts/blobServices/containers` | Deployment container, avatar container, Functions-managed host containers | No public container ACLs; immutable media/package names and controlled cleanup |
+| PostgreSQL: `Microsoft.DBforPostgreSQL/flexibleServers` | Burstable `Standard_B1ms` where available, PostgreSQL 16, 32 GiB starting storage, HA off | One small transactional database; monitor CPU credits, memory, storage and connections |
+| Database/configuration children | One application database; required server settings/extensions | PostGIS, and `pg_trgm` if the implemented substring-search index uses it; no extra analytics database |
+| VNet: `Microsoft.Network/virtualNetworks` | One small VNet, separate Functions-integration and private-endpoint subnets | Private runtime-to-database traffic without a firewall appliance, NAT gateway or VPN service |
+| PostgreSQL private endpoint: `Microsoft.Network/privateEndpoints` | One endpoint for PostgreSQL | Runtime database access; do not add private endpoints to every service by default |
+| Private DNS: `Microsoft.Network/privateDnsZones`, links and endpoint zone group | PostgreSQL private-link zone linked to the app VNet | Runtime FQDN resolves to the private endpoint |
+| Maps: `Microsoft.Maps/accounts` | One Gen2 account | Current map tiles/location search and guest token broker; no separate geospatial database service |
+| Communication Services: `Microsoft.Communication/communicationServices` | One resource | Low-volume application email endpoint; not used for Entra signin emails |
+| Email Service/domain: `Microsoft.Communication/emailServices` and domain/sender children | One verified owned sender domain | SPF/DKIM/domain setup and linkage to Communication Services |
+| Logs: `Microsoft.OperationalInsights/workspaces` | One workspace, basic retention/budget settings | Shared diagnostic destination; do not create a workspace per function |
+| Application Insights: `Microsoft.Insights/components` | One workspace-based instance | API, dependency, exception and timer telemetry |
+| Alerts: `Microsoft.Insights/actionGroups`, metric/log alert rules | One owner action group and a few actionable alerts | API failures, database saturation, failed/stuck notification jobs and budget warnings |
+| Role assignments / optional budget | Resource-scoped grants; one cost budget | Configure workload access and cost notifications, not a blanket subscription Owner role |
+
+Verify the selected versions, exact SKU identifiers, quotas and region
+compatibility before generating the corresponding ARM/Bicep properties.
+PostgreSQL Burstable is deliberately a small non-HA starting point, not a
+high-availability promise. Keep platform backups enabled and prove a restore.
+Use at least the platform's seven-day backup retention initially.
+
+Free SWA has no contractual SLA. If that is unacceptable, select Standard;
+do not describe the Free pilot as covered by a paid availability commitment.
+Do not add database HA, read replicas, a second region or permanent standby
+apps merely to call this a production application.
+
+### 21.2 Network boundaries and deployment access
+
+The intended small topology is:
+
+```mermaid
+flowchart LR
+    Browser[Browser] -->|HTTPS| SWA[Static web app]
+    Browser -->|HTTPS and API token when required| API[Public Functions API]
+    API -->|VNet integration| PE[PostgreSQL private endpoint]
+    PE --> PG[(Small PostgreSQL server)]
+    API -->|HTTPS with managed identity| Storage[Authenticated Storage endpoints]
+    API -->|HTTPS| Providers[Maps and ACS]
+    Deploy[Temporary deployment or operator IP] -. Narrow firewall rule for migrations .-> PG
+```
+
+Use PostgreSQL's **public-access networking mode with Private Link**, rather
+than combining its mutually different delegated-private-network mode with a
+private endpoint. Runtime traffic uses the private endpoint. The public
+database endpoint has default-deny firewall rules; a deployment/operator may
+temporarily allow only its exact public IP to run migrations/admin commands
+with TLS and Entra database authentication.
+
+This avoids a permanent private build runner, jumpbox, VPN, container registry
+and migration-container service for a 100-user app. Verify Private Link/public
+firewall coexistence for the selected server configuration before provisioning.
+If the selected region/configuration cannot support it, stop and choose an
+explicitly supported access path; do not enable the broad "all Azure
+services" database firewall exception.
+
+The Functions integration subnet uses the Flex-specific delegation and sizing
+documented for the selected plan; the endpoint has its own nondelegated
+subnet. Link `privatelink.postgres.database.azure.com` to the VNet and attach
+the endpoint DNS zone group. Connect using the normal PostgreSQL FQDN with
+certificate verification, never a raw private IP or disabled TLS validation.
+
+Temporary migration firewall rules must be removed in a pipeline `finally`
+step, use run-specific names, and be checked for leftovers by deployment
+verification and the owner's runbook. Do not remove a firewall rule that
+belongs to another active deployment.
+
+Storage may use authenticated public service endpoints at this scale:
+"public endpoint" does not mean "public container." Require managed identity,
+HTTPS and private container ACLs, disable anonymous blob access, and disable
+shared-key authentication once the identity-based Functions/deployment paths
+are correctly configured. No storage access key enters the SPA.
+
+### 21.3 Minimum identity and permission boundaries
+
+| Identity | Required access | Must not receive |
+| --- | --- | --- |
+| Customer SPA registration | OpenID signin and the Connect API delegated scope | Azure RBAC, database credentials, Graph directory-write permissions |
+| Connect API registration in External ID | Defines the API audience/scope consumed by the customer SPA | A browser client secret |
+| Runtime managed identity | Necessary host/deployment/media storage data permissions, Maps capability, email-send permission, restricted PostgreSQL runtime principal | Subscription Owner, PostgreSQL superuser/schema-migration rights, Entra user-administration rights |
+| Deployment identity | Resource deployment at the app scope, explicitly authorized role assignment, package deployment, controlled temporary DB firewall management | Unrestricted reuse in the browser or application requests |
+| Migration/operator database identity | Named schema migration/admin role for approved tasks | Permanent embedding of its credential in app configuration |
+| Human External ID administrator | Configure customer user flows and handle rare identity-lifecycle actions | Automatic customer elevation to this role |
+
+Use Azure resource RBAC and PostgreSQL database roles as separate layers.
+An Azure Contributor assignment does not grant SQL table access. Bootstrap the
+managed-identity database principal through the configured PostgreSQL Entra
+administrator, grant only required DML/sequence rights, and preserve the
+migration role as a separate identity.
+
+For host storage, apply the documented identity-based `AzureWebJobsStorage`
+data-role requirements; do not guess that Blob Reader alone permits host
+leases and host-container writes. Add queue/table data roles only if the host
+or chosen bindings actually require them. The application itself does not
+use a Storage Queue in this design.
+
+One Functions app means one runtime security boundary. Module organization
+does not isolate one HTTP handler from the app's identity permissions.
+
+### 21.4 Provider integration completion
+
+The Maps broker must return a supported short-lived capability for the Maps
+SDK's existing token callback. Keep Azure resource credentials server-side,
+apply account/region/rate restrictions supported by the selected token
+mechanism, and grant only required Maps data and token-issuance permissions.
+Never claim that returning a provider token with a shorter local cache TTL
+shortens that token's actual validity.
+
+Use server-side Maps search with the existing `{ label, latitude, longitude }`
+adapter. Provider search responses are not automatically trusted profile or
+meeting data. Redact search query strings from request/dependency telemetry,
+including `/locations/search?q=...`, because a user may type a private address.
+
+For email, verify the owned sender domain, configure the required DNS records,
+link it to Communication Services, and grant the documented sending
+permission to the runtime identity. Keep the sender fixed in server
+configuration; a caller cannot supply an arbitrary `From` address or
+recipient. Send only to the operation's authorized recipient and verified
+current contact address, except the narrowly controlled verification message.
+
+ACS operation completion means provider acceptance, not proof of inbox
+delivery. Do not add Event Grid, webhook authentication, delivery analytics,
+or a bounce-processing service for the first iteration unless a measured
+operational need requires them. Use provider diagnostics and the owner's
+runbook for the initial low-volume mail service. Preflight email quotas and
+sender reputation; never assume a newly created domain can send unlimited mail.
+
+### 21.5 Explicitly deferred infrastructure
+
+No Kubernetes, microservice fleet, Redis, Service Bus, Event Grid, dedicated
+worker app, separate admin API, search cluster, analytics warehouse, Front
+Door/APIM, NAT gateway, VPN gateway, permanent runner VM, multi-region standby,
+or PostgreSQL HA/read replica is part of the initial bill of materials.
+
+Key Vault is added only for an actual remaining secret requirement. Public
+client/account IDs and Application Insights connection strings are
+configuration, not reasons to invent a secret-management subsystem. Small
+application signing secrets, if required for cursor/abuse-key protection, may
+use encrypted app settings populated through protected deployment inputs;
+never put them in source, build output, `VITE_*`, or unmasked pipeline logs.
+
+Measure before expanding: database CPU-credit exhaustion or sustained memory/
+connection pressure justifies a larger database; repeated app throttling
+justifies higher tested Functions limits; expensive polling justifies
+evaluating real-time delivery; contractual availability objectives justify
+SWA Standard/HA and recovery redesign. None is implied by 10-100 users alone.
