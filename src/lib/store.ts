@@ -2,7 +2,7 @@ import { storeCopy } from '../copies/index'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { getAgeFromBirthDate } from './catalog'
-import { createAlerts, createConnects, createMessages, DEMO_PROFILE } from './fixtures'
+import { createAlerts, createConnects, createMessages, SAMPLE_PROFILE } from './fixtures'
 import { getDistanceKilometers, hasMapPoint, isEnded } from './format'
 import type { ActionResult, Alert, Attendance, Connect, Message, Profile } from './types'
 
@@ -45,7 +45,7 @@ interface AppState {
   setCardStyle: (style: 'row' | 'tile') => void
   setPalette: (palette: 'ink' | 'riso') => void
   setDefaultRadiusKilometers: (radiusKilometers: number) => void
-  demoLogin: () => void
+  loadSampleProfile: () => void
   completeSignup: (profile: Profile) => void
   updateProfile: (changes: Partial<Profile>) => void
   logout: () => void
@@ -89,7 +89,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => {
       if (!Number.isFinite(radiusKilometers) || radiusKilometers < 1 || radiusKilometers > 100) { result(false, storeCopy.chooseADefaultRadiusFrom1To100Km); return }
       set({ defaultRadiusKilometers: radiusKilometers })
     },
-    demoLogin: () => set({ profile: { ...DEMO_PROFILE } }),
+    loadSampleProfile: () => set({ profile: { ...SAMPLE_PROFILE } }),
     completeSignup: profile => set({ profile, blockedUserIds: [], reports: [], ratingsByConnectId: {}, alerts: [] }),
     updateProfile: changes => {
       const profile = get().profile

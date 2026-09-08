@@ -2,7 +2,7 @@ import { connectContent, fixturesCopy } from '../copies'
 import { AVATAR_COLORS, CATEGORIES } from './catalog'
 import type { Alert, Connect, Message, Person, Profile } from './types'
 
-export const DEMO_PROFILE: Profile = {
+export const SAMPLE_PROFILE: Profile = {
   id: 'noa', name: fixturesCopy.noaBerkovich, username: fixturesCopy.noab, email: fixturesCopy.noaExampleCom,
   phoneNumber: fixturesCopy.text972542184409, gender: fixturesCopy.woman, birthDate: fixturesCopy.text19970418,
   biography: fixturesCopy.mostlyFootballSometimesCatanUsuallyTheOneWithThe,
@@ -61,7 +61,7 @@ export function createConnects(): Connect[] {
       status: 'published', creationMode: 'later',
     }
   })
-  const currentPerson = { id: DEMO_PROFILE.id, name: DEMO_PROFILE.name, color: '#d9c7f0' }
+  const currentPerson = { id: SAMPLE_PROFILE.id, name: SAMPLE_PROFILE.name, color: '#d9c7f0' }
   connects[4].attendees[1] = currentPerson
   connects[1].joinRequests.push({ ...currentPerson, note: fixturesCopy.happyToLearnTheRulesIsThereStillRoom })
   const pastConnect: Connect = {

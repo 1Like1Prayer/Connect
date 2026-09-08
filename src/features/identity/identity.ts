@@ -1,7 +1,7 @@
 import { identityCopy } from '../../copies/index'
 import { z } from 'zod'
 import { CATEGORIES } from '../../lib/catalog'
-import { DEMO_PROFILE, PERSONS } from '../../lib/fixtures'
+import { SAMPLE_PROFILE, PERSONS } from '../../lib/fixtures'
 import type { Connect, Profile } from '../../lib/types'
 
 export const MAX_AVATAR_BYTES = 1024 * 1024
@@ -128,7 +128,7 @@ export async function readAvatar(file: File): Promise<string> {
 }
 
 export function findMember(id: string, connects: Connect[]): Profile | null {
-  if (id === DEMO_PROFILE.id) return { ...DEMO_PROFILE }
+  if (id === SAMPLE_PROFILE.id) return { ...SAMPLE_PROFILE }
   const hostedConnectCount = connects.filter(connect => connect.hostId === id)
   const host = hostedConnectCount[0]
   const person = PERSONS.find(item => item.id === id)

@@ -84,7 +84,7 @@
 .profileName{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:18px}
 .profileName h1{font-size:27px;line-height:1.1;letter-spacing:-.02em;margin:0;overflow-wrap:anywhere}
 .handle{font-size:13.5px;color:var(--secondary-text);margin:8px 0 0;line-height:1.5;overflow-wrap:anywhere}
-.bio{font-size:15px;line-height:1.55;margin:16px 0 20px;white-space:pre-wrap;overflow-wrap:anywhere}
+.biography{font-size:15px;line-height:1.55;margin:16px 0 20px;white-space:pre-wrap;overflow-wrap:anywhere}
 .profileInterests{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:22px}
 .profileInterests>span{padding:9px 13px;border:1.5px solid var(--subtle-border-color);border-radius:999px;background:var(--panel)}
 .profileMain{padding:30px 32px 60px;min-width:0}

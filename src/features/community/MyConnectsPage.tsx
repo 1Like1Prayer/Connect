@@ -93,10 +93,10 @@ function MineCard({ connect, tab, profile, onLeave, onRate }: {
   const rating = useAppStore(applicationState => applicationState.ratingsByConnectId[connect.id])
   const attendance = getAttendance(connect, profile)
   const isHost = connect.hostId === profile.id
-  const pending = connect.joinRequests.length
+  const pendingRequestCount = connect.joinRequests.length
   const status = connect.status === 'cancelled' ? myConnectsPageCopy.cancelled
     : isEnded(connect) ? attendance === 'joined' || isHost ? myConnectsPageCopy.ended : myConnectsPageCopy.requestClosed
-    : isHost ? pending ? myConnectsPageCopy.waiting(String(pending), String(pending === 1 ? 'request' : 'requests')) : myConnectsPageCopy.published
+    : isHost ? pendingRequestCount ? myConnectsPageCopy.pendingRequestsLabel(pendingRequestCount) : myConnectsPageCopy.published
     : attendance === 'pending' ? myConnectsPageCopy.approvalPending
     : attendance === 'waitlist' ? myConnectsPageCopy.waitlist(String(connect.waitlist.findIndex(person => person.id === profile.id) + 1)) : myConnectsPageCopy.going
   const canRate = connect.status === 'published' && isEnded(connect) && attendance === 'joined' && !isHost
@@ -106,7 +106,7 @@ function MineCard({ connect, tab, profile, onLeave, onRate }: {
   }
   return <article className={styles.mineCard} style={categoryStyle(color)}>
     <div className={styles.mineCardContent}>
-      <div className={styles.cardLabels}><CategoryLabel category={connect.categoryKey} subcategoryName={connect.subcategoryNames.join(', ')} /><Badge active={isHost && pending > 0 && tab === myConnectsPageCopy.hosting}>{status}</Badge><Badge>{costLabel(connect)}</Badge>{connect.visibility === myConnectsPageCopy.linkOnly && <Badge>{myConnectsPageCopy.linkOnly}</Badge>}</div>
+      <div className={styles.cardLabels}><CategoryLabel category={connect.categoryKey} subcategoryName={connect.subcategoryNames.join(', ')} /><Badge active={isHost && pendingRequestCount > 0 && tab === myConnectsPageCopy.hosting}>{status}</Badge><Badge>{costLabel(connect)}</Badge>{connect.visibility === myConnectsPageCopy.linkOnly && <Badge>{myConnectsPageCopy.linkOnly}</Badge>}</div>
       <h2><Link to={`/connect/${connect.id}`}>{connect.title}</Link></h2>
       <p className={styles.eventMetadata}>{dayLabel(connect.startsAt, connect.timeZone)}{myConnectsPageCopy.commaSeparatorWithSpace}{timeLabel(connect.startsAt, connect.timeZone)} <span aria-hidden="true">{myConnectsPageCopy.middleDotSeparator}</span> {placeLabel(connect)} <span aria-hidden="true">{myConnectsPageCopy.middleDotSeparator}</span> {connect.attendees.length}{myConnectsPageCopy.going2}{connect.capacity !== null ? myConnectsPageCopy.spots(String(connect.capacity)) : ''}</p>
       {connect.status === 'cancelled' && connect.cancellationReason && <p className={styles.cancelReason}>{connect.cancellationReason}</p>}
@@ -115,7 +115,7 @@ function MineCard({ connect, tab, profile, onLeave, onRate }: {
     </div>
     <div className={styles.cardActions}>
       {tab === myConnectsPageCopy.hosting && <>
-        <PageLink to={`/connect/${connect.id}/manage`} primary>{pending ? myConnectsPageCopy.reviewRequests : myConnectsPageCopy.manageConnect}</PageLink>
+        <PageLink to={`/connect/${connect.id}/manage`} primary>{pendingRequestCount ? myConnectsPageCopy.reviewRequests : myConnectsPageCopy.manageConnect}</PageLink>
         <PageLink to={`/connect/${connect.id}/edit`}>{myConnectsPageCopy.editConnect}</PageLink>
         <div className={styles.minorActions}><button type="button" onClick={calendar}>{myConnectsPageCopy.addToCalendar}</button><Link to={`/connect/${connect.id}/manage`}>{myConnectsPageCopy.cancel}</Link>{connect.visibility === myConnectsPageCopy.linkOnly && <Link to={`/connect/${connect.id}`}>{myConnectsPageCopy.openInviteLink}</Link>}</div>
       </>}

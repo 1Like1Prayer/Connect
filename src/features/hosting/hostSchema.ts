@@ -80,12 +80,12 @@ export const STEP_FIELDS: (keyof HostValues)[][] = [
 export const needsOtherDetails = (values: Pick<HostValues, 'categoryKey' | 'subcategoryNames'>) => values.categoryKey === 'other' || values.subcategoryNames.includes(hostSchemaCopy.other)
 
 export function eventTimes(values: HostValues, existing?: Connect, now = new Date()): { start: TimeResult; end: TimeResult } {
-  const preserveSeconds = (selected: TimeResult, original?: string): TimeResult => selected.success && original && Date.parse(selected.iso) === Math.floor(Date.parse(original) / 60000) * 60000
-    ? { success: true, iso: original }
+  const preserveSeconds = (selected: TimeResult, original?: string): TimeResult => selected.success && original && Date.parse(selected.isoTimestamp) === Math.floor(Date.parse(original) / 60000) * 60000
+    ? { success: true, isoTimestamp: original }
     : selected
   return {
     start: values.creationMode === 'now'
-      ? { success: true, iso: existing?.creationMode === 'now' ? existing.startsAt : now.toISOString() }
+      ? { success: true, isoTimestamp: existing?.creationMode === 'now' ? existing.startsAt : now.toISOString() }
       : preserveSeconds(localToInstant(values.startDate, values.startTime, values.timeZone, values.startOccurrence), existing?.startsAt),
     end: preserveSeconds(localToInstant(values.endDate, values.endTime, values.timeZone, values.endOccurrence), existing?.endsAt),
   }
@@ -127,12 +127,12 @@ export function createHostSchema(existing?: Connect) {
     if (!end.success) {
       issue(end.kind === 'ambiguous' ? 'endOccurrence' : 'endTime', end.message)
     }
-    if (start.success && values.creationMode === 'later' && Date.parse(start.iso) <= Date.now()) {
-      const unchangedOngoing = existing?.creationMode === 'later' && start.iso === existing.startsAt
+    if (start.success && values.creationMode === 'later' && Date.parse(start.isoTimestamp) <= Date.now()) {
+      const unchangedOngoing = existing?.creationMode === 'later' && start.isoTimestamp === existing.startsAt
       if (!unchangedOngoing) issue('startTime', hostSchemaCopy.aScheduledConnectMustStartInTheFutureChoose)
     }
-    if (start.success && end.success && Date.parse(end.iso) <= Date.parse(start.iso)) issue('endTime', hostSchemaCopy.theEndMustBeAfterTheStartUseA)
-    if (end.success && Date.parse(end.iso) <= Date.now()) issue('endTime', hostSchemaCopy.theEndMustStillBeInTheFuture)
+    if (start.success && end.success && Date.parse(end.isoTimestamp) <= Date.parse(start.isoTimestamp)) issue('endTime', hostSchemaCopy.theEndMustBeAfterTheStartUseA)
+    if (end.success && Date.parse(end.isoTimestamp) <= Date.now()) issue('endTime', hostSchemaCopy.theEndMustStillBeInTheFuture)
   })
 }
 

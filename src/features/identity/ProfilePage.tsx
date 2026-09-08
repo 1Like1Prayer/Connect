@@ -242,7 +242,7 @@ function ProfileView({ member, own }: { member: Profile; own: boolean }) {
       <div className={styles.profileName}><h1>{member.name}</h1></div>
       <p className={styles.handle}>{profilePageCopy.usernamePrefix}{member.username}{member.location ? profilePageCopy.separator5(String(member.location)) : ''}</p>
       <PublicDetails profile={member} />
-      <p className={styles.bio}>{member.biography || profilePageCopy.noBioYet}</p>
+      <p className={styles.biography}>{member.biography || profilePageCopy.noBioYet}</p>
       <div className={styles.profileInterests}>{member.interests.map(category => <span key={category}><CategoryLabel category={category} /></span>)}</div>
       {own ? <div className={styles.actions}>
         <Button variant="primary" onClick={() => focusEditor('profile-name')}>{profilePageCopy.editProfile}</Button>

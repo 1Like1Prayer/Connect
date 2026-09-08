@@ -82,7 +82,7 @@ export const myConnectsPageCopy = {
   separator5: (value: string | number, secondValue: string | number) => "" + String(value) + " " + String(secondValue) + "",
   star: "star",
   stars: "stars",
-  waiting: (pending: string | number, secondValue: string | number) => "" + String(pending) + " " + String(secondValue) + " waiting",
+  pendingRequestsLabel: (requestCount: number) => `${requestCount} ${requestCount === 1 ? 'request' : 'requests'} waiting`,
   spots: (capacity: string | number) => " / " + String(capacity) + " spots",
   pending: "pending",
   waitlist2: "waitlist",

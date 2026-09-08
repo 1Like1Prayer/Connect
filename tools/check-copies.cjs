@@ -1,10 +1,10 @@
-const fs = require('node:fs')
+const fileSystem = require('node:fs')
 const path = require('node:path')
-const ts = require('typescript')
+const typescript = require('typescript')
 const root = path.resolve(__dirname, '..')
 const files = []
 function walk(directory) {
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+  for (const entry of fileSystem.readdirSync(directory, { withFileTypes: true })) {
     const file = path.join(directory, entry.name)
     if (entry.isDirectory()) {
       if (entry.name !== 'copies') walk(file)
@@ -19,53 +19,53 @@ const technicalFunctions = new Set(['fieldError', 'text', 'issue', 'part', 'rese
 const humanWords = new Set(['Free', 'Any', 'Today', 'Tomorrow', 'Host', 'Going', 'Welcome', 'Connect', 'Profile', 'Other', 'Sports', 'Gaming', 'Social', 'Woman', 'Man', 'UTC'])
 const failures = []
 function nameOf(node) {
-  return ts.isIdentifier(node) || ts.isStringLiteral(node) ? node.text : ''
+  return typescript.isIdentifier(node) || typescript.isStringLiteral(node) ? node.text : ''
 }
 function visibleValueAttribute(node) {
   let attribute = node
-  while (attribute && !ts.isJsxAttribute(attribute) && !ts.isStatement(attribute)) attribute = attribute.parent
-  if (!attribute || !ts.isJsxAttribute(attribute) || !['value', 'defaultValue'].includes(attribute.name.getText())) return false
+  while (attribute && !typescript.isJsxAttribute(attribute) && !typescript.isStatement(attribute)) attribute = attribute.parent
+  if (!attribute || !typescript.isJsxAttribute(attribute) || !['value', 'defaultValue'].includes(attribute.name.getText())) return false
   const attributes = attribute.parent.properties
   if (!['Input', 'input', 'textarea'].includes(attribute.parent.parent.tagName?.getText())) return false
-  const type = attributes.find(prop => ts.isJsxAttribute(prop) && prop.name.getText() === 'type')?.initializer?.text
-  return !['radio', 'checkbox', 'hidden'].includes(type) && (attribute.name.getText() === 'defaultValue' || attributes.some(prop => ts.isJsxAttribute(prop) && prop.name.getText() === 'readOnly'))
+  const type = attributes.find(prop => typescript.isJsxAttribute(prop) && prop.name.getText() === 'type')?.initializer?.text
+  return !['radio', 'checkbox', 'hidden'].includes(type) && (attribute.name.getText() === 'defaultValue' || attributes.some(prop => typescript.isJsxAttribute(prop) && prop.name.getText() === 'readOnly'))
 }
 function isTechnical(node) {
   for (let current = node.parent; current; current = current.parent) {
-    if (ts.isTypeNode(current) || ts.isImportDeclaration(current) || ts.isExportDeclaration(current)) return true
-    if (ts.isExpression(current) || ts.isStatement(current) || ts.isJsxElement(current)) break
+    if (typescript.isTypeNode(current) || typescript.isImportDeclaration(current) || typescript.isExportDeclaration(current)) return true
+    if (typescript.isExpression(current) || typescript.isStatement(current) || typescript.isJsxElement(current)) break
   }
   const parent = node.parent
-  if ((ts.isPropertyAssignment(parent) || ts.isPropertySignature(parent) || ts.isMethodDeclaration(parent)) && parent.name === node) return true
-  if (ts.isElementAccessExpression(parent) && parent.argumentExpression === node) return true
+  if ((typescript.isPropertyAssignment(parent) || typescript.isPropertySignature(parent) || typescript.isMethodDeclaration(parent)) && parent.name === node) return true
+  if (typescript.isElementAccessExpression(parent) && parent.argumentExpression === node) return true
   for (let current = parent; current; current = current.parent) {
-    if (ts.isVariableDeclaration(current) && /(?:^|_)FIELDS$/.test(nameOf(current.name))) return true
-    if (ts.isJsxAttribute(current)) return !textAttributes.has(current.name.getText()) && !visibleValueAttribute(current)
-    if (ts.isPropertyAssignment(current)) {
+    if (typescript.isVariableDeclaration(current) && /(?:^|_)FIELDS$/.test(nameOf(current.name))) return true
+    if (typescript.isJsxAttribute(current)) return !textAttributes.has(current.name.getText()) && !visibleValueAttribute(current)
+    if (typescript.isPropertyAssignment(current)) {
       const key = nameOf(current.name)
       if (dataProperties.has(key)) return false
-      if (key === 'name' && ts.isStringLiteral(node) && /[A-Z]|\s/.test(node.text)) return false
+      if (key === 'name' && typescript.isStringLiteral(node) && /[A-Z]|\s/.test(node.text)) return false
       return technicalProperties.has(key)
     }
-    if (ts.isCallExpression(current)) {
-      if (current.expression.kind === ts.SyntaxKind.ImportKeyword) return true
-      const method = ts.isPropertyAccessExpression(current.expression) ? current.expression.name.text : ts.isIdentifier(current.expression) ? current.expression.text : ''
+    if (typescript.isCallExpression(current)) {
+      if (current.expression.kind === typescript.SyntaxKind.ImportKeyword) return true
+      const method = typescript.isPropertyAccessExpression(current.expression) ? current.expression.name.text : typescript.isIdentifier(current.expression) ? current.expression.text : ''
       const first = current.arguments[0]
       if (first && technicalFunctions.has(method) && node.pos >= first.pos && node.end <= first.end) return true
       if (method === 'setAttribute' && first) return node === first || !textAttributes.has(first.text)
       break
     }
-    if (ts.isStatement(current) || ts.isFunctionLike(current)) break
+    if (typescript.isStatement(current) || typescript.isFunctionLike(current)) break
   }
   return false
 }
 function looksLikeCopy(text, node) {
   if (!text || isTechnical(node)) return false
-  if (ts.isJsxExpression(node.parent) && (ts.isJsxElement(node.parent.parent) || ts.isJsxFragment(node.parent.parent))) return true
-  for (let current = node.parent; current && !ts.isStatement(current); current = current.parent) if (ts.isJsxAttribute(current) && textAttributes.has(current.name.getText())) return true
+  if (typescript.isJsxExpression(node.parent) && (typescript.isJsxElement(node.parent.parent) || typescript.isJsxFragment(node.parent.parent))) return true
+  for (let current = node.parent; current && !typescript.isStatement(current); current = current.parent) if (typescript.isJsxAttribute(current) && textAttributes.has(current.name.getText())) return true
   if (visibleValueAttribute(node)) return true
-  if (ts.isJsxAttribute(node.parent)) return textAttributes.has(node.parent.name.getText())
-  if (ts.isPropertyAssignment(node.parent) && dataProperties.has(nameOf(node.parent.name))) return true
+  if (typescript.isJsxAttribute(node.parent)) return textAttributes.has(node.parent.name.getText())
+  if (typescript.isPropertyAssignment(node.parent) && dataProperties.has(nameOf(node.parent.name))) return true
   if (/^(?:ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Enter|Escape|Home|End|Tab|Space|Backspace|Delete|Key[A-Z])$/.test(text)) return false
   if (/^(?:https?:|mailto:|data:|blob:|\/|\.\/|\.\.\/)/.test(text)) return false
   if (/^#[\da-fA-F]{3,8}$/.test(text) || /^(?:rgb|hsl|var|repeat|translate|rotate)\(/.test(text)) return false
@@ -75,21 +75,21 @@ function looksLikeCopy(text, node) {
   return humanWords.has(text) || /^[A-Z]{2,8}$/.test(text) || /\b[A-Z][a-z]/.test(text) || /[a-zA-Z][\s,.;!?@]|\s[a-zA-Z]/.test(text) || /[^\x00-\x7f]/.test(text)
 }
 for (const file of files) {
-  const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
+  const source = typescript.createSourceFile(file, fileSystem.readFileSync(file, 'utf8'), typescript.ScriptTarget.Latest, true)
   function visit(node) {
-    const text = ts.isJsxText(node) ? node.text.trim()
-      : ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ? node.text
-      : ts.isTemplateExpression(node) ? [node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('{value}')
+    const text = typescript.isJsxText(node) ? node.text.trim()
+      : typescript.isStringLiteral(node) || typescript.isNoSubstitutionTemplateLiteral(node) ? node.text
+      : typescript.isTemplateExpression(node) ? [node.head.text, ...node.templateSpans.map(span => span.literal.text)].join('{value}')
       : null
-    if (text && (ts.isJsxText(node) || looksLikeCopy(text, node))) {
+    if (text && (typescript.isJsxText(node) || looksLikeCopy(text, node))) {
       const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
       failures.push(`${path.relative(root, file)}:${line}: ${JSON.stringify(text.slice(0, 130))}`)
     }
-    ts.forEachChild(node, visit)
+    typescript.forEachChild(node, visit)
   }
   visit(source)
 }
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8')
+const html = fileSystem.readFileSync(path.join(root, 'index.html'), 'utf8')
 if (/<title>[^<]+<\/title>|<meta\s+name="description"\s+content="[^"]+"/i.test(html)) failures.push('index.html: document copy must come from src/copies/app/metadata.ts')
 if (failures.length) {
   console.error('Move user-facing copy to src/copies:\n' + failures.join('\n'))

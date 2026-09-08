@@ -10,7 +10,7 @@ the presentation does not establish those service capabilities.
 
 ## Approved specification changes
 
-The user explicitly resolved the conflicts with the earlier "Gather" architecture:
+The user explicitly resolved the conflicts with the earlier architecture:
 
 | Area | Current decision |
 | --- | --- |
@@ -36,7 +36,7 @@ attendance -> coordinate -> meet.**
 
 The preview includes Welcome/login and recovery/provider entry points; seven-step
 signup; Discover with category/search/location/time/availability filters and
-list/map layouts; gathering details; eight-step hosting plus publication
+list/map layouts; Connect details; eight-step hosting plus publication
 confirmation; host management; categories; My Connects; group chat; own/member
 profiles; alerts/preferences; and the prototype's UI kit.
 
@@ -67,15 +67,63 @@ The dotted notice board, thick category side/top accents, rounded outlined
 cards, and offset shadows deliberately reproduce the supplied visual reference;
 they are not unsolicited changes to its design language.
 
+Theme tokens use descriptive names: `--background`, `--text-color`,
+`--secondary-text`, `--border-color`, `--subtle-border-color`,
+`--hover-background`, `--shadow-color`, `--skeleton-background`, `--alert-color`,
+`--success-color`, and `--category-color`. Hue tokens such as `--lime` and
+`--pink` retain their names.
+
 Forms validate each wizard step and the complete final submission. Domain state
 changes are centralized outside presentation components. Passwords remain only in
 transient form state and are not persisted or sent to a service.
 
 UI copy describes the product without development disclaimers. Authored
-gathering/member content remains client-side until a data API is integrated.
+Connect/member content remains client-side until a data API is integrated.
 Session storage is readable by same-origin JavaScript and
 browser developer tools; **it is not an authorization boundary**. A production
 API must filter private profile and location values before returning them.
+
+### Domain naming and browser state
+
+`Connect` is the domain model, and `connects` is the list-state property.
+Use full, descriptive words and include units in numeric property names.
+Ordinary readable identifiers such as `name`, `email`, and `id` remain concise.
+Standard React, browser, and SDK fields retain their required names; translate
+external values at integration boundaries rather than renaming provider contracts.
+Application action and time-calculation results use `success`; the native
+browser `Response.ok` property remains unchanged.
+
+| Domain | Descriptive properties |
+| --- | --- |
+| Connect classification and content | `categoryKey`, `subcategoryNames`, `whatToBring`, `timeZone`, `skillLevel`, `ageRestriction`, `costType`, `costAmount` |
+| Connect location | `publicAreaLabel`, `latitude`, `longitude`, `distanceKilometers`, `locationType`, `meetingNotes`, `venueName`, `meetingInstructions` |
+| Connect participation and host | `joinRequests`, `hostedConnectCount`, `hostAttendanceRate`, `isHostVerified`, `isGuestListPrivate` |
+| Profile | `biography`, `phoneNumber`, `avatarDataUrl`, `isVerified`, `hostedConnectCount`, `attendanceRate` |
+| Message and alert | Both use `connectId`; messages use `isPinned`, and alerts use `isRead` |
+| Category colors | `primaryColor`, `alternateColor` |
+| Discovery radius and preferences | `radiusKilometers`, `defaultRadiusKilometers` |
+| Community state | `blockedUserIds`, `ratingsByConnectId` |
+
+`locationType` accepts `physical`, `online`, or `undecided`.
+
+Connect initialization and state operations use `createConnects`, `joinConnect`,
+`leaveConnect`, `publishConnect`, `updateConnect`, `cancelConnect`, and
+`rateConnect`. Authored fixture data lives in `src/copies/data/connects.json`;
+discovery ordering lives in `src/features/discovery/sortConnects.ts`.
+
+The rename starts fresh browser-state, host-draft, and community-feedback formats:
+
+| Stored data | Namespace |
+| --- | --- |
+| Application state | `connect-state-v2`, with persistence version `2` |
+| Host drafts | `connect-host-draft-v2:...` |
+| Community feedback | `connect-community-feedback-v2` |
+
+Previously saved data is not loaded, migrated, or copied into the new formats.
+Earlier storage namespaces remain physically untouched: they are neither read
+nor deleted. Earlier host-draft migrations have been removed, and no compatibility
+aliases are retained for earlier field names. This local format change does not
+connect or change production integrations.
 
 ## 3. Catalog
 
@@ -95,12 +143,13 @@ Categories and subcategories are configured, not user-created taxonomy.
 
 A host selects one parent and one or more of its subcategories. Category
 selection controls the color and symbol used across cards, map markers, and
-details. Describing an Other activity belongs to the gathering; it does not
+details. Describing an Other activity belongs to the Connect; it does not
 create a new taxonomy entry.
 
-The future database design therefore needs a gathering/subcategory join table,
-not the original single `gatherings.subcategory_id`. Migrations and API contracts
-must enforce that selected subcategories belong to the selected parent.
+The future database design therefore needs a `connect_subcategories` join table
+with a `connect_id` foreign key, not a single subcategory field on `connects`.
+Database migrations and API contracts must enforce that selected subcategories
+belong to the selected parent.
 
 ## 4. Profiles, signup, and privacy
 
@@ -108,7 +157,7 @@ Signup follows the HTML sequence: name/username; email/password; personal
 details; optional photo; interests; location; completion. Birth date and photo
 can be skipped. Entering a phone number does not authorize sharing it.
 
-Signup uses a centered single-column form without a gathering-promotion
+Signup uses a centered single-column form without a Connect-promotion
 sidebar. Privacy controls retain their safe initial values without repeating
 "off by default" in their labels or helper text.
 
@@ -135,8 +184,8 @@ a production policy; fixture ages and badges are not verified identity.
 
 Hosting covers category, subcategories, optional descriptive content, timing, location,
 capacity/visibility/joining, skill/age/cost, and review. It supports starting now
-or planning ahead. Every Connect ends, and its timezone is explicit. Start/end
-offsets are determined automatically from the IANA timezone, with no normal
+or planning ahead. Every Connect ends, and its time zone is explicit. Start/end
+offsets are determined automatically from the IANA time zone, with no normal
 UTC-offset inputs. Nonexistent local times are rejected; repeated local times
 show a first/second-occurrence choice only when disambiguation is necessary.
 
@@ -145,7 +194,7 @@ To be decided. Nonphysical Connects have no coordinates or distance and never
 receive a fabricated map marker. Meeting links/details can remain private.
 
 Capacity includes the host and can be unlimited, as in the HTML. Pending
-requests do not consume confirmed spots. Full gatherings expose waitlist
+requests do not consume confirmed spots. Full Connects expose waitlist
 behavior. Only hosts can approve/decline requests, offer waitlist spots, edit,
 or cancel. Capacity cannot be reduced below confirmed attendance.
 
@@ -162,11 +211,11 @@ unauthorized browser at all.
 Cost modes are Free, Split cost, Pay your own, and Ticketed. This preview
 displays and edits the information only; it never collects a payment.
 Group chats require confirmed attendance to send; ended/cancelled chats are
-read-only. Ratings are limited to attended past gatherings. Report/block flows
+read-only. Ratings are limited to attended past Connects. Report/block flows
 provide local feedback and remove relevant shared access in preview state.
 
 Joining, leaving, approval, cancellation, and capacity changes must serialize
-on the same gathering row in PostgreSQL in production. Use `SELECT ... FOR
+on the same Connect row in PostgreSQL in production. Use `SELECT ... FOR
 UPDATE` on one acquired connection and write outbox work in the same
 transaction. A local Zustand mutation does not establish concurrency safety
 between accounts or browsers.
@@ -183,11 +232,19 @@ encoded in URL parameters. Device/search coordinates remain in memory, not
 browser history or share links. Manual location selection remains available;
 denying geolocation must not break browsing.
 
+Descriptive discovery filter properties and query keys include `timeFilter`,
+`skillLevelFilter`, `ageFilter`, `costFilter`, and `radiusKilometers`.
+
 Discover fills the viewport at every result count; lists, maps, and filters
 scroll within their panels rather than resizing the page. Sorting uses radio
 controls for Distance, Relevance, and Popularity. Relevance prioritizes search
 matches and selected interests, with start time as a tie-breaker. Popularity
-orders by confirmed attendance; sorting does not mutate stored gatherings.
+orders by confirmed attendance; sorting does not mutate stored Connects.
+Sort keys remain `distance`, `relevance`, and `popularity`.
+
+Client radii use `radiusKilometers`, with `defaultRadiusKilometers` for the
+saved preference. The future server discovery contract uses `radiusMeters`;
+convert units explicitly at the API boundary.
 
 To enable live Azure Maps, copy `.env.example` to `.env.local` and configure:
 
@@ -201,7 +258,7 @@ The frontend integration contract is:
 | Route | Response |
 | --- | --- |
 | `GET /api/v1/maps/token` | `{ "token": "<short-lived Maps token>" }` |
-| `GET /api/v1/locations/search?q=...` | `{ "results": [{ "label": "...", "lat": 32.1, "lng": 34.8 }] }` |
+| `GET /api/v1/locations/search?q=...` | `{ "results": [{ "label": "...", "latitude": 32.1, "longitude": 34.8 }] }` |
 
 The SDK uses anonymous token-callback authentication with the public Maps
 account client ID. Never provide a subscription key or client secret in the
@@ -216,7 +273,7 @@ coordinates. After selecting a result, the host confirms the pin. Provider
 failures offer retry states while leaving list discovery usable.
 
 In production use Azure Maps Search for addresses/POIs and PostgreSQL/PostGIS
-for gathering discovery. Respect Azure Maps attribution and applicable
+for Connect discovery. Respect Azure Maps attribution and applicable
 provider-result licensing/retention; keep host-authored instructions distinct
 from provider-derived labels.
 
@@ -245,6 +302,12 @@ profile projection, exact-location access, and moderation authoritative on the
 API. Ignore caller-supplied actor IDs. Use shared Zod schemas, stable JSON
 errors/request IDs, idempotency, optimistic versions, and conflict responses.
 
+Future Connect resources use `/api/v1/connects` and
+`/api/v1/connects/{connectId}`. PostgreSQL stores Connects in the `connects`
+table, and related tables refer to them through `connect_id` foreign keys.
+Client models and JSON relationships use `connectId`. These are planned naming
+contracts, not implemented routes or database changes.
+
 Use a transactional database outbox with a leased timer worker and Azure
 Communication Services Email for application notifications. Retry transient
 failures, deduplicate jobs, invalidate stale versions, and do not promise
@@ -270,7 +333,7 @@ src/
   features/
     welcome/           Landing, custom login and recovery/provider previews
     identity/          Signup and profiles
-    discovery/         Search/list/map and gathering detail
+    discovery/         Search/list/map and Connect detail
     hosting/           Hosting wizard and organizer management
     community/         Categories, plans, chat, alerts, design kit
   lib/                 Typed domain models, catalog, demo fixtures, state, API

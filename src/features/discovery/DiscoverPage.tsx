@@ -66,7 +66,7 @@ export function DiscoverPage() {
   const applyFilters = handleSubmit(values => {
     const next = new URLSearchParams(params)
     for (const [key, value] of Object.entries(values)) {
-      const defaultValue = key === 'radius' ? defaultRadiusKilometers : defaults[key as keyof typeof defaults]
+      const defaultValue = key === 'radiusKilometers' ? defaultRadiusKilometers : defaults[key as keyof typeof defaults]
       if (value === defaultValue) next.delete(key); else next.set(key, String(value))
     }
     setParams(next, { replace: true }); setFiltersOpen(false)

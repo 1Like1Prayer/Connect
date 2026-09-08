@@ -2,7 +2,7 @@ import { hostTimeCopy } from '../../copies/index'
 export type Occurrence = '' | 'first' | 'second'
 
 type TimeError = { success: false; kind: 'invalid' | 'nonexistent' | 'ambiguous'; message: string }
-export type TimeResult = { success: true; iso: string } | TimeError
+export type TimeResult = { success: true; isoTimestamp: string } | TimeError
 export type TimeCandidates = { success: true; instants: readonly string[] } | TimeError
 
 const formatters = new Map<string, Intl.DateTimeFormat>()
@@ -88,7 +88,7 @@ export function localToInstant(date: string, time: string, timeZone: string, occ
   if (candidates.instants.length > 1 && !occurrence) {
     return { success: false, kind: 'ambiguous', message: hostTimeCopy.thisTimeHappensTwiceChooseTheFirstOrSecond }
   }
-  return { success: true, iso: candidates.instants[candidates.instants.length > 1 && occurrence === 'second' ? 1 : 0] }
+  return { success: true, isoTimestamp: candidates.instants[candidates.instants.length > 1 && occurrence === 'second' ? 1 : 0] }
 }
 
 export function zonedFields(instant: Date, timeZone: string): { date: string; time: string; occurrence: Occurrence } {

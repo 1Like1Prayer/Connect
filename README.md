@@ -1,7 +1,31 @@
 # Connect
 
-A React and TypeScript application for discovering, hosting, and joining gatherings.
+A React and TypeScript application for discovering, hosting, and joining Connects.
 Vite provides the development server and production build.
+
+## Domain naming and local state
+
+The domain model is `Connect`, with list state named `connects`. Authored fixture
+data lives in `src/copies/data/connects.json`, and discovery ordering lives in
+`src/features/discovery/sortConnects.ts`.
+
+Use descriptive properties such as `categoryKey`, `timeZone`, `whatToBring`,
+`publicAreaLabel`, and `connectId`. Include units in numeric names, such as
+`distanceKilometers`, `radiusKilometers`, and `defaultRadiusKilometers`; the
+future server radius contract remains `radiusMeters`. Keep ordinary readable
+names such as `name`, `email`, and `id`, and preserve required React, browser,
+and SDK field names. Application action and time-calculation results use
+`success`, while native `Response.ok` remains unchanged. See
+[Architecture.md](Architecture.md) for the full domain naming, discovery query
+keys, theme tokens, and API contracts.
+
+The rename starts fresh local formats: `connect-state-v2` with persistence
+version `2`, `connect-host-draft-v2:...`, and `connect-community-feedback-v2`.
+Previously saved data is not loaded or migrated; earlier namespaces are neither
+read nor deleted, leaving their stored keys physically untouched. Earlier
+host-draft migrations have been removed, with no compatibility aliases for
+earlier field names. This changes local preview storage only; production
+integrations remain unchanged and unconnected.
 
 ## Getting started
 

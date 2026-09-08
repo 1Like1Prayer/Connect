@@ -16,7 +16,7 @@ export const hostSchemaCopy = {
   aPinGetsPeopleToThePlaceTheMeeting: "A pin gets people to the place. The meeting point gets them to you.",
   theRules: "The rules",
   spotsVisibilityAndJoining: "Spots, visibility and joining",
-  startWithTheDefaultsThenMakeThisConnectWork: "Start with the defaults, then make this connect work for you.",
+  startWithTheDefaultsThenMakeThisConnectWork: "Start with the defaults, then make this Connect work for you.",
   details: "Details",
   skillAgeAndCost: "Skill, age and cost",
   allThreeDefaultToOpenSetThemOnlyWhere: "All three default to open. Set them only where they genuinely matter.",

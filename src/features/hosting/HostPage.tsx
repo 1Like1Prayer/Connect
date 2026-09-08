@@ -77,7 +77,7 @@ function HostWizard({ profile, existing }: { profile: Profile; existing?: Hostin
   const startOccurrenceLabel = values.creationMode === 'later' && startRepeated && values.startOccurrence ? values.startOccurrence === 'first' ? hostPageCopy.firstOccurrence : hostPageCopy.secondOccurrence : ''
   const endOccurrenceLabel = endRepeated && values.endOccurrence ? values.endOccurrence === 'first' ? hostPageCopy.firstOccurrence : hostPageCopy.secondOccurrence : ''
   const dateSummary = time.start.success && time.end.success
-    ? `${dayLabel(time.start.iso, values.timeZone)}, ${timeLabel(time.start.iso, values.timeZone)}${startOccurrenceLabel} - ${dayLabel(time.end.iso, values.timeZone)}, ${timeLabel(time.end.iso, values.timeZone)}${endOccurrenceLabel}`
+    ? `${dayLabel(time.start.isoTimestamp, values.timeZone)}, ${timeLabel(time.start.isoTimestamp, values.timeZone)}${startOccurrenceLabel} - ${dayLabel(time.end.isoTimestamp, values.timeZone)}, ${timeLabel(time.end.isoTimestamp, values.timeZone)}${endOccurrenceLabel}`
     : hostPageCopy.chooseADateAndTime
   const capacitySummary = values.unlimited ? hostPageCopy.noLimit : hostPageCopy.peopleIncludingYou(String(values.capacity || '?'))
   const options = { shouldDirty: true, shouldValidate: true } as const
@@ -92,10 +92,10 @@ function HostWizard({ profile, existing }: { profile: Profile; existing?: Hostin
   useEffect(() => {
     if (step === 8 || existing || initial.restored || dirtyFields.endDate || dirtyFields.endTime || dirtyFields.endOccurrence) return
     const start = values.creationMode === 'now'
-      ? { success: true as const, iso: new Date().toISOString() }
+      ? { success: true as const, isoTimestamp: new Date().toISOString() }
       : localToInstant(values.startDate, values.startTime, values.timeZone, values.startOccurrence)
     if (!start.success || !validTimezone(values.timeZone)) return
-    const end = zonedFields(new Date(Date.parse(start.iso) + 3600000), values.timeZone)
+    const end = zonedFields(new Date(Date.parse(start.isoTimestamp) + 3600000), values.timeZone)
     setValue('endDate', end.date); setValue('endTime', end.time); setValue('endOccurrence', end.occurrence)
   }, [step, values.creationMode, values.startDate, values.startTime, values.startOccurrence, values.timeZone, existing, initial.restored, dirtyFields.endDate, dirtyFields.endTime, dirtyFields.endOccurrence, setValue])
 
@@ -182,7 +182,7 @@ function HostWizard({ profile, existing }: { profile: Profile; existing?: Hostin
     setValue('startDate', start.date, { shouldDirty: true }); setValue('startTime', start.time, { shouldDirty: true }); setValue('startOccurrence', start.occurrence, { shouldDirty: true })
     const instant = localToInstant(start.date, start.time, values.timeZone, start.occurrence)
     if (instant.success) {
-      const end = zonedFields(new Date(Date.parse(instant.iso) + 3600000), values.timeZone)
+      const end = zonedFields(new Date(Date.parse(instant.isoTimestamp) + 3600000), values.timeZone)
       setValue('endDate', end.date, { shouldDirty: true }); setValue('endTime', end.time, { shouldDirty: true }); setValue('endOccurrence', end.occurrence, { shouldDirty: true })
     }
     void trigger(STEP_FIELDS[3])
@@ -207,7 +207,7 @@ function HostWizard({ profile, existing }: { profile: Profile; existing?: Hostin
       id: existing?.id ?? crypto.randomUUID(), categoryKey: data.categoryKey, subcategoryNames: data.subcategoryNames,
       title: data.title.trim(), description: data.description.trim(), whatToBring: data.whatToBring.trim(),
       otherDescription: needsOtherDetails(data) ? data.otherDescription.trim() : '',
-      startsAt: times.start.iso, endsAt: times.end.iso, timeZone: data.timeZone,
+      startsAt: times.start.isoTimestamp, endsAt: times.end.isoTimestamp, timeZone: data.timeZone,
       locationType: data.locationType, meetingNotes: data.locationType === 'physical' ? '' : data.meetingNotes.trim(),
       publicAreaLabel: connectArea(data),
       venueName: point ? point.label : data.locationType === 'online' ? hostPageCopy.online : hostPageCopy.placeToBeDecided,
@@ -314,7 +314,7 @@ function HostWizard({ profile, existing }: { profile: Profile; existing?: Hostin
             {needsOtherDetails(values) && <Field label={hostPageCopy.describeYourOtherActivity} htmlFor="host-other" error={fieldError('otherDescription')} hint={hostPageCopy.tellPeopleWhatThisActivityIsThisDetailIs}><textarea id="host-other" rows={3} maxLength={500} aria-invalid={!!errors.otherDescription} {...register('otherDescription')} /></Field>}
           </div>}
           {step === 3 && <div className={styles.formStack}>
-            <ChoiceGroup label={hostPageCopy.whenAreYouConnect} value={values.creationMode} options={[{ value: 'now', label: hostPageCopy.happeningNow2 }, { value: 'later', label: hostPageCopy.planForLater }]} onChange={value => setValue('creationMode', value, options)} />
+            <ChoiceGroup label={hostPageCopy.whenWillYouMeet} value={values.creationMode} options={[{ value: 'now', label: hostPageCopy.happeningNow2 }, { value: 'later', label: hostPageCopy.planForLater }]} onChange={value => setValue('creationMode', value, options)} />
             <Field label={hostPageCopy.timezone} htmlFor="host-timezone" error={fieldError('timeZone')} hint={hostPageCopy.datesAndTimesUseThisTimezone}><Input id="host-timezone" list="host-timezones" placeholder={hostPageCopy.europeLondon} {...register('timeZone', { onChange: () => { resetOccurrence('start'); resetOccurrence('end'); clearErrors('timeZone') } })} /><datalist id="host-timezones">{[hostPageCopy.asiaJerusalem, hostPageCopy.utcTimeZone, hostPageCopy.europeLondon, hostPageCopy.europeParis, hostPageCopy.americaNewYork, hostPageCopy.americaLosAngeles, hostPageCopy.asiaKolkata, hostPageCopy.australiaSydney].map(zone => <option key={zone} value={zone} />)}</datalist></Field>
             {values.creationMode === 'now' ? <p className={styles.help}>{existing?.creationMode === 'now' ? hostPageCopy.thisConnectHasAlreadyStartedChooseWhenItEnds : hostPageCopy.startsWhenYouPublishChooseAnEndTimeSo}</p> : <>
               <div className={styles.dateGrid}>
@@ -386,7 +386,7 @@ function HostWizard({ profile, existing }: { profile: Profile; existing?: Hostin
         <div className={styles.feedCard} style={{ borderLeftColor: category.primaryColor }}><CategoryLabel category={values.categoryKey} subcategoryName={values.subcategoryNames.join(' / ') || category.name} />
           <h3>{values.title || hostPageCopy.yourNextGoodPlanStartsHere}</h3>
           <p>{!physical ? placeLabel : privateLocation ? hostPageCopy.exactAddressHidden(String(values.publicAreaLabel || hostPageCopy.yourNeighbourhood)) : values.location?.label || hostPageCopy.chooseAPlaceToMeet}</p>
-          <strong>{values.creationMode === 'now' ? hostPageCopy.happeningNow2 : time.start.success ? `${dayLabel(time.start.iso, values.timeZone)}, ${timeLabel(time.start.iso, values.timeZone)}` : hostPageCopy.chooseAStartTime}</strong>
+          <strong>{values.creationMode === 'now' ? hostPageCopy.happeningNow2 : time.start.success ? `${dayLabel(time.start.isoTimestamp, values.timeZone)}, ${timeLabel(time.start.isoTimestamp, values.timeZone)}` : hostPageCopy.chooseAStartTime}</strong>
           <div className={styles.previewBadges}><Badge>{capacitySummary}</Badge><Badge>{values.joinPolicy === 'approval' ? hostPageCopy.approval2 : hostPageCopy.instantJoin}</Badge>{values.visibility === hostPageCopy.linkOnly && <Badge>{hostPageCopy.linkOnly}</Badge>}<Badge>{hostCostLabel(values)}</Badge></div>
         </div>
         <p className={styles.previewNote}>{hostPageCopy.placeStartTimeAndSpotsAreWhatPeopleScan}</p>

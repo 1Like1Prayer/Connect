@@ -98,7 +98,7 @@ export const hostPageCopy = {
   anythingPeopleShouldBring: "Anything people should bring",
   describeYourOtherActivity: "Describe your Other activity",
   tellPeopleWhatThisActivityIsThisDetailIs: "Tell people what this activity is. This detail is required when you choose Other.",
-  whenAreYouConnect: "When are you connect?",
+  whenWillYouMeet: "When will you meet?",
   happeningNow2: "Happening now",
   planForLater: "Plan for later",
   timezone: "Timezone",
