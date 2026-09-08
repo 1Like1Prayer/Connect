@@ -1556,3 +1556,167 @@ Keep the job/template payload schema versioned. The notification timer must
 understand outstanding supported payloads across releases; an unknown version
 fails visibly rather than being discarded. Do not add event sourcing, replay
 infrastructure, or per-feature worker services.
+
+## 20. End-to-end implementation details
+
+### 20.1 Write payloads and adapters
+
+These named schemas are required in `contracts`; export inferred TypeScript
+types and an OpenAPI document from the implemented contracts. Do not create a
+second manually maintained API schema that can drift.
+
+| Schema | Input contract |
+| --- | --- |
+| `CompleteProfileInput` | Name, username, contact email, phone number, gender key, birth date/withheld flag, bio/location, four sharing flags, 2-9 unique interest keys, radius, optional owned ready media ID; never credentials or writable statistics |
+| `UpdateProfileInput` | Partial editable profile fields, excluding username/identity/statistics; apply consent resets and validate the merged profile |
+| `PreferenceInput` | Optional integer radius and three notification booleans; reject unknown fields |
+| `ConnectWriteInput` | Category/subcategory keys, authored text, schedule, location, capacity, joining/visibility/guest-list rules, skill, structural eligibility, cost type/amount/currency |
+| `ScheduleInput` | `creationMode`, `timeZone`, optional scheduled `startLocal` and required `endLocal`; local endpoints contain `date`, `time`, and optional `first|second` occurrence |
+| `LocationInput` | `locationType`, visibility, public area, physical venue/latitude/longitude/pin-confirmation or nonphysical meeting notes; incompatible values rejected/cleared through explicit mode changes |
+| `CostInput` | Cost type, integer minor-unit amount, `ILS`; the adapter converts the current major-unit form amount without binary floating-point rounding |
+| `DiscoveryInput` | Trimmed query up to 200 characters, bounded category/subcategory keys, radius/center, calendar timezone, time/skill/age/cost/availability filters, sort, cursor and limit |
+| `ParticipationInput` | Optional note up to 500 characters; no acting account ID |
+| `MessageInput` | Trimmed nonempty text up to 2,000 characters; no author or server timestamp |
+| `FeedbackInput` | Integer stars 1-5, optional `all|no_show`; no rated host ID or aggregate values |
+| `ReportInput` | Exactly one accessible member/Connect target, supported reason key, optional bounded details; preserve current per-surface validation requirements |
+
+Map public option labels such as `Everyone`/`Link only` and `Prefer not to say`
+to stable codes before sending. Do not rename the existing UI indiscriminately
+or restore outdated `Gathering`, `lat`, `lng`, or `tbd` contracts.
+
+Onboarding draft and hosting draft schemas are distinct partial-document
+schemas. They are not used to validate publication or activate a member.
+Responses for age/timezone/last-spot/version conflicts must identify stable
+error codes and the affected fields so the existing wizard can reveal the
+correct stage without losing user input.
+
+### 20.2 Authentication and profile completion sequence
+
+1. MSAL redirects to the configured External ID user flow; Entra owns password, verification and recovery screens.
+2. MSAL obtains a Connect API access token; the API validates it and bootstraps the unique account.
+3. Incomplete members save/resume their six-stage Connect profile draft. Provider authentication alone does not activate application capabilities.
+4. Completion locks the account/draft, validates the full profile, claims the unique username, writes interests/preferences, and changes status to active in one transaction.
+5. The API returns `Me`; the SPA clears the draft and returns to the safe destination. Joining/hosting still requires an explicit new command.
+6. If contact email was not independently verified, show a verification action in profile settings. This does not block the authenticated product flow, but prevents application email to an unverified address.
+
+A failure after Entra signup but before Connect completion is recoverable:
+next signin resolves the same account and resumes the draft. A duplicate
+username does not require deleting or re-creating the Entra identity.
+
+### 20.3 Contact verification without extra infrastructure
+
+After profile completion, generate the verification token cryptographically
+and store only its digest, owner, contact-email version, expiry and attempt
+limit. Send the token through ACS **after committing** the challenge, keeping
+the raw token only in process memory. Do not create a Key Vault key hierarchy
+or encrypted-token queue solely for this low-volume flow.
+
+Record a provider operation ID when available. If submission fails, report
+failure. If the outcome is ambiguous, report unknown; do not claim successful
+delivery or silently resend a new token. The user's explicit Resend creates a
+new challenge and invalidates the earlier one. Replaying the same command key
+returns its recorded status rather than sending another email.
+
+Use a same-origin verification link with the token in the fragment, remove it
+from browser history immediately, and post it in the authenticated API body.
+Never log the token, place it in analytics, or mark verification successful on
+a GET request. The completion transaction checks owner, digest, expiry,
+attempts, consumption and the current email version, then consumes it once.
+Changing the email invalidates all older links.
+
+### 20.4 Avatar replacement
+
+1. Validate request size and authenticated owner, and reserve a server-generated media ID/blob name.
+2. Decode/type-check the bounded image, remove unnecessary metadata, and upload it using the app's managed identity. No arbitrary URL fetch or public upload credential is accepted.
+3. In a short transaction, confirm owner and expected profile/draft version, mark media ready, attach its reference, and mark the previous image superseded.
+4. Return a controlled image reference only after attachment succeeds. On a storage or database failure, return the real error; leave identifiable pending/superseded state for cleanup.
+5. The daily cleanup timer checks that old media is unreferenced before deleting the exact blob. It never deletes a current avatar based only on age.
+
+No Blob transaction can be atomic with PostgreSQL. These explicit states make
+partial failure recoverable without a distributed transaction coordinator.
+For an onboarding member, attachment is to the owned draft, not to an
+invented active profile.
+
+### 20.5 Publication, admission, and notification sequence
+
+```mermaid
+sequenceDiagram
+    participant UI as Connect SPA
+    participant API as Functions API
+    participant DB as PostgreSQL
+    participant Timer as Notification timer
+    participant ACS as ACS Email
+    UI->>API: Command, API token, version/idempotency key
+    API->>DB: Begin, acquire ordered policy/Connect locks
+    API->>DB: Recheck rules and change domain rows
+    API->>DB: Insert recipient alerts and notification jobs
+    API->>DB: Commit
+    API-->>UI: Authoritative permitted result
+    Timer->>DB: Claim due jobs with lease
+    Timer->>DB: Recheck membership, version and preferences
+    Timer->>ACS: Submit or poll outside DB transaction
+    ACS-->>Timer: Operation state
+    Timer->>DB: Persist accepted, failed, suppressed or unknown
+```
+
+At this scale, command services can select at most the actual member
+population and write the resulting jobs directly. Use a unique dedupe key
+such as `(commandId, recipientId, templateKey)`; reminder keys additionally
+include Connect version and approved reminder offset.
+
+The worker may complete after the user sees the successful domain action.
+Its delay does not roll back a confirmed spot. Failed email does not undo
+attendance; the app's recipient alert remains available.
+
+Publication, new confirmed participation, timing changes and cancellation
+must create/update/suppress reminder rows in their transactions. The worker
+also rechecks them, so a scheduled job cannot disclose an old private location
+or remind a member who has already left.
+
+### 20.6 Simple location and discovery behavior
+
+Use the current approximate-point behavior as a starting privacy policy:
+generalize private physical coordinates to a 0.01-degree grid for public
+search while retaining the original exact point separately. This is an
+approximate meeting area, not an anonymity guarantee. Use only the generalized
+point in public distance/radius/sort calculations.
+
+The server validates coordinate bounds, finiteness, location mode, field
+limits, and required public area. A browser `confirmed` flag records a UI
+choice; it does not prove physical presence or that a location is safe.
+Hosts must not enter an exact address in their public-area label; expose the
+public preview so they can see what will be shared.
+
+At 10-100 users, ordinary PostgreSQL queries and indexes are sufficient.
+Do not add a search cluster, materialized ranking pipeline, Redis cache, map
+clustering service, or vector database. Keep queries bounded and observe
+actual latency before introducing any of them.
+
+### 20.7 Manual safety and account deletion
+
+The small-team operator reviews new reports regularly using the admin CLI.
+Actions use parameterized services and the same ownership/participation
+invariants as the API, record a reason, and do not require giving a customer
+moderator privileges.
+
+For a deletion request, mark the account deletion-pending and prevent further
+protected actions or public exposure of its private profile. Notify the owner
+through the established operational channel. The operator then:
+
+1. Confirms the authenticated request, grace period and applicable retention policy.
+2. Cancels future owned Connects and removes future non-host participation through the domain services, with safe participant notifications.
+3. Removes profiles, contact data, drafts and images; pseudonymizes retained references and redacts the member's authored content where the deletion policy requires it.
+4. Deletes the corresponding customer identity through the correct Entra tenant's admin portal and records the provider outcome.
+5. Retains only justified tombstone/audit information for the approved period, verifies cleanup, and marks the request complete.
+
+The account row may remain as a pseudonymous FK target; this is not permission
+to retain its personal fields indefinitely. Do not claim completion while
+provider deletion or required application cleanup is outstanding. An
+identity digest prevents an old valid token from recreating the deleted
+application account during the retirement window.
+
+Customers can cancel an unexecuted request during the configured grace period.
+Do not pretend cancellation restores already cancelled events or deleted
+content. A documented owner, completion deadline and resumable admin procedure
+are launch requirements; automated Graph deletion and an admin console are
+explicitly deferred.
